@@ -7,13 +7,17 @@ extern crate walkdir;
 use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process;
 
-use clap::{App, Arg};
+use clap::{App, Arg, SubCommand};
 use git2::Repository;
 use ini::Ini;
 use walkdir::WalkDir;
 
 const CONFIG_ARG: &str = "CONFIG";
+const PULL_CMD: &str = "pull";
+const STATUS_CMD: &str = "status";
+const VERBOSE_ARG: &str = "VERBOSE";
 
 fn main() {
     let m = App::new("mgit")
@@ -27,6 +31,14 @@ fn main() {
              .multiple(true)
              .number_of_values(1)
              .value_name("PATH"))
+        .subcommand(SubCommand::with_name(PULL_CMD)
+                    .about("Fetch from remotes, move tracking refs forward"))
+        .subcommand(SubCommand::with_name(STATUS_CMD)
+                    .about("Print repo status to stdout")
+                    .arg(Arg::with_name(VERBOSE_ARG)
+                         .help("Print status of up-to-date branches")
+                         .short("v")
+                         .long("verbose")))
         .get_matches();
 
     let config_paths: Vec<&str> = match m.values_of(CONFIG_ARG) {
@@ -51,8 +63,15 @@ fn main() {
         config.extend(read_config_path(&path_buf));
     }
 
-    for (name, repo) in config {
-        println!("{}: {:?}", name, repo.path());
+    if let Some(_) = m.subcommand_matches(PULL_CMD) {
+        println!("pull command is not yet implemented");
+        process::exit(1);
+    } else if let Some(_) = m.subcommand_matches(STATUS_CMD) {
+        println!("status command is not yet implemented");
+        process::exit(1);
+    } else {
+        println!("no command suppled, see `mgit --help` for usage info");
+        process::exit(1);
     }
 }
 
