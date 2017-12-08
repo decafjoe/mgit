@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::{App, Arg, SubCommand};
-use git2::Repository;
+use git2::{Repository, StatusOptions, StatusShow};
 use ini::Ini;
 use walkdir::WalkDir;
 
@@ -115,6 +115,19 @@ fn pull(config: &HashMap<String, Repository>) {
 }
 
 fn status(config: &HashMap<String, Repository>) {
-    println!("status command is not yet implemented");
-    process::exit(1);
+    let mut status_options = StatusOptions::new();
+    status_options.show(StatusShow::IndexAndWorkdir);
+    status_options.include_untracked(true);
+    status_options.exclude_submodules(true);
+    status_options.recurse_untracked_dirs(true);
+    status_options.renames_head_to_index(true);
+    status_options.renames_index_to_workdir(true);
+    status_options.renames_from_rewrites(true);
+    for (name, repo) in config {
+        if let Ok(statuses) = repo.statuses(Some(&mut status_options)) {
+            println!("success!");
+        } else {
+            panic!("failed to get status info from: {:?}", repo.path());
+        };
+    }
 }
