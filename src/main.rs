@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate clap;
+extern crate git2;
 extern crate ini;
 extern crate walkdir;
 
@@ -8,6 +9,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 use clap::{App, Arg};
+use git2::Repository;
 use ini::Ini;
 use walkdir::WalkDir;
 
@@ -32,7 +34,7 @@ fn main() {
         None => vec!["~/.mgit"],
     };
 
-    let mut config: HashMap<String, String> = HashMap::new();
+    let mut config: HashMap<String, Repository> = HashMap::new();
     for path in config_paths {
         let path_buf = if path.starts_with("~/") {
             let mut path_buf = match env::home_dir() {
@@ -49,12 +51,12 @@ fn main() {
         config.extend(read_config_path(&path_buf));
     }
 
-    for (name, path) in config {
-        println!("{}: {}", name, path);
+    for (name, repo) in config {
+        println!("{}: {:?}", name, repo.path());
     }
 }
 
-fn read_config_path(path: &Path) -> HashMap<String, String> {
+fn read_config_path(path: &Path) -> HashMap<String, Repository> {
     if path.is_file() {
         read_config_file(path)
     } else if path.is_dir() {
@@ -76,14 +78,18 @@ fn read_config_path(path: &Path) -> HashMap<String, String> {
     }
 }
 
-fn read_config_file(path: &Path) -> HashMap<String, String> {
+fn read_config_file(path: &Path) -> HashMap<String, Repository> {
     let mut config = HashMap::new();
     if let Some(ext) = path.extension() {
         if ext == "conf" {
             if let Ok(ini) = Ini::load_from_file(path) {
                 if let Some(repos) = ini.section(Some("repos")) {
                     for (key, value) in repos.iter() {
-                        config.insert(key.to_owned(), value.to_owned());
+                        if let Ok(repo) = Repository::open(value) {
+                            config.insert(key.to_owned(), repo);
+                        } else {
+                            panic!("failed to open repo: {}", value);
+                        };
                     }
                 }
             } else {
