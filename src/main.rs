@@ -47,20 +47,34 @@ fn main() {
     };
 
     let mut config: HashMap<String, Repository> = HashMap::new();
-    for path in config_paths {
-        let path_buf = if path.starts_with("~/") {
-            let mut path_buf = match env::home_dir() {
-                Some(path_buf) => path_buf,
+    for raw_path in config_paths {
+        let path = if raw_path.starts_with("~/") {
+            let mut path = match env::home_dir() {
+                Some(path) => path,
                 None => panic!("could not determine home directory"),
             };
-            if path.len() > 2 {
-                path_buf.push(&path[2..]);
+            if raw_path.len() > 2 {
+                path.push(&raw_path[2..]);
             }
-            path_buf
+            path
         } else {
-            PathBuf::from(path)
+            PathBuf::from(raw_path)
         };
-        config.extend(read_config_path(&path_buf));
+        if path.is_file() {
+            config.extend(read_config_file(&path));
+        } else if path.is_dir() {
+            for entry in WalkDir::new(path) {
+                if let Ok(entry) = entry {
+                    if let Ok(metadata) = entry.metadata() {
+                        if metadata.is_file() {
+                            config.extend(read_config_file(&entry.path()));
+                        }
+                    } else {
+                        panic!("failed to get metadata for: {:?}", raw_path);
+                    }
+                }
+            }
+        }
     }
 
     if let Some(_) = m.subcommand_matches(PULL_CMD) {
@@ -72,28 +86,6 @@ fn main() {
     } else {
         println!("no command suppled, see `mgit --help` for usage info");
         process::exit(1);
-    }
-}
-
-fn read_config_path(path: &Path) -> HashMap<String, Repository> {
-    if path.is_file() {
-        read_config_file(path)
-    } else if path.is_dir() {
-        let mut config = HashMap::new();
-        for entry in WalkDir::new(path) {
-            if let Ok(entry) = entry {
-                if let Ok(metadata) = entry.metadata() {
-                    if metadata.is_file() {
-                        config.extend(read_config_file(&entry.path()));
-                    }
-                } else {
-                    panic!("failed to get metadata for path: {:?}", path);
-                }
-            }
-        }
-        config
-    } else {
-        HashMap::new()
     }
 }
 
