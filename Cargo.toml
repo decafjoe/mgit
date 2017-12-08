@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Joe Joyce <joe@decafjoe.com>"]
 
 [dependencies]
+rust-ini = "~0.10.0"
 walkdir = "~2.0.1"
 
 [dependencies.clap]

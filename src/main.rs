@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate clap;
+extern crate ini;
 extern crate walkdir;
 
 use std::collections::HashMap;
@@ -7,6 +8,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 
 use clap::{App, Arg};
+use ini::Ini;
 use walkdir::WalkDir;
 
 const CONFIG_ARG: &str = "CONFIG";
@@ -67,5 +69,17 @@ fn populate_config_from_path(config: &HashMap<&str, &str>, path: &Path) {
 }
 
 fn populate_config_from_file(config: &HashMap<&str, &str>, path: &Path) {
-    println!("populating config from file: {:?}", path);
+    if let Some(ext) = path.extension() {
+        if ext == "conf" {
+            if let Ok(ini) = Ini::load_from_file(path) {
+                if let Some(repos) = ini.section(Some("repos")) {
+                    for (key, value) in repos.iter() {
+                        println!("{} = {}", *key, *value);
+                    }
+                }
+            } else {
+                panic!("failed to read configuration file");
+            }
+        }
+    }
 }
