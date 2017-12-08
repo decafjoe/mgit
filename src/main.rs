@@ -109,7 +109,7 @@ fn read_config_file(path: &Path) -> HashMap<String, Repository> {
     config
 }
 
-fn pull(config: &HashMap<String, Repository>) {
+fn pull(_config: &HashMap<String, Repository>) {
     println!("pull command is not yet implemented");
     process::exit(1);
 }
