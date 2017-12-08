@@ -78,11 +78,9 @@ fn main() {
     }
 
     if let Some(_) = m.subcommand_matches(PULL_CMD) {
-        println!("pull command is not yet implemented");
-        process::exit(1);
+        pull(&config);
     } else if let Some(_) = m.subcommand_matches(STATUS_CMD) {
-        println!("status command is not yet implemented");
-        process::exit(1);
+        status(&config);
     } else {
         println!("no command suppled, see `mgit --help` for usage info");
         process::exit(1);
@@ -109,4 +107,14 @@ fn read_config_file(path: &Path) -> HashMap<String, Repository> {
         }
     }
     config
+}
+
+fn pull(config: &HashMap<String, Repository>) {
+    println!("pull command is not yet implemented");
+    process::exit(1);
+}
+
+fn status(config: &HashMap<String, Repository>) {
+    println!("status command is not yet implemented");
+    process::exit(1);
 }
