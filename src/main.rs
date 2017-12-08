@@ -66,7 +66,7 @@ fn read_config_path(path: &Path) -> HashMap<String, String> {
                         config.extend(read_config_file(&entry.path()));
                     }
                 } else {
-                    panic!("failed to get metadata for path");
+                    panic!("failed to get metadata for path: {:?}", path);
                 }
             }
         }
@@ -87,7 +87,7 @@ fn read_config_file(path: &Path) -> HashMap<String, String> {
                     }
                 }
             } else {
-                panic!("failed to read configuration file");
+                panic!("failed to read configuration file: {:?}", path);
             }
         }
     }
