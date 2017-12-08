@@ -57,7 +57,7 @@ fn main() {
 fn read_config_path(path: &Path) -> HashMap<String, String> {
     if path.is_file() {
         read_config_file(path)
-    } else {
+    } else if path.is_dir() {
         let mut config = HashMap::new();
         for entry in WalkDir::new(path) {
             if let Ok(entry) = entry {
@@ -71,6 +71,8 @@ fn read_config_path(path: &Path) -> HashMap<String, String> {
             }
         }
         config
+    } else {
+        HashMap::new()
     }
 }
 
