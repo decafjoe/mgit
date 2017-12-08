@@ -32,7 +32,7 @@ fn main() {
         None => vec!["~/.mgit"],
     };
 
-    let mut config: HashMap<&str, &str> = HashMap::new();
+    let mut config: HashMap<String, String> = HashMap::new();
     for path in config_paths {
         let path_buf = if path.starts_with("~/") {
             let mut path_buf = match env::home_dir() {
@@ -46,35 +46,42 @@ fn main() {
         } else {
             PathBuf::from(path)
         };
-        populate_config_from_path(&config, &path_buf);
+        config.extend(read_config_path(&path_buf));
+    }
+
+    for (name, path) in config {
+        println!("{}: {}", name, path);
     }
 }
 
-fn populate_config_from_path(config: &HashMap<&str, &str>, path: &Path) {
+fn read_config_path(path: &Path) -> HashMap<String, String> {
     if path.is_file() {
-        populate_config_from_file(&config, &path);
+        read_config_file(path)
     } else {
+        let mut config = HashMap::new();
         for entry in WalkDir::new(path) {
             if let Ok(entry) = entry {
                 if let Ok(metadata) = entry.metadata() {
                     if metadata.is_file() {
-                        populate_config_from_file(&config, &entry.path());
+                        config.extend(read_config_file(&entry.path()));
                     }
                 } else {
                     panic!("failed to get metadata for path");
                 }
             }
         }
+        config
     }
 }
 
-fn populate_config_from_file(config: &HashMap<&str, &str>, path: &Path) {
+fn read_config_file(path: &Path) -> HashMap<String, String> {
+    let mut config = HashMap::new();
     if let Some(ext) = path.extension() {
         if ext == "conf" {
             if let Ok(ini) = Ini::load_from_file(path) {
                 if let Some(repos) = ini.section(Some("repos")) {
                     for (key, value) in repos.iter() {
-                        println!("{} = {}", *key, *value);
+                        config.insert(key.to_owned(), value.to_owned());
                     }
                 }
             } else {
@@ -82,4 +89,5 @@ fn populate_config_from_file(config: &HashMap<&str, &str>, path: &Path) {
             }
         }
     }
+    config
 }
