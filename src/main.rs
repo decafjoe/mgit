@@ -123,11 +123,49 @@ fn status(config: &HashMap<String, Repository>) {
     status_options.renames_head_to_index(true);
     status_options.renames_index_to_workdir(true);
     status_options.renames_from_rewrites(true);
-    for (name, repo) in config {
-        if let Ok(statuses) = repo.statuses(Some(&mut status_options)) {
-            println!("success!");
-        } else {
-            panic!("failed to get status info from: {:?}", repo.path());
-        };
+
+    let modified_flags = git2::STATUS_WT_DELETED
+        | git2::STATUS_WT_MODIFIED
+        | git2::STATUS_WT_RENAMED
+        | git2::STATUS_WT_TYPECHANGE;
+
+    let uncommitted_flags = git2::STATUS_INDEX_DELETED
+        | git2::STATUS_INDEX_MODIFIED
+        | git2::STATUS_INDEX_NEW
+        | git2::STATUS_INDEX_RENAMED
+        | git2::STATUS_INDEX_TYPECHANGE;
+
+    let mut names: Vec<&str> = Vec::new();
+    for name in config.keys() {
+        names.push(name);
+    }
+    names.sort();
+
+    for name in names {
+        println!("\n{}", name);
+        if let Some(repo) = config.get(name) {
+            let mut modified = 0;
+            let mut uncommitted = 0;
+            let mut untracked = 0;
+            if let Ok(statuses) = repo.statuses(Some(&mut status_options)) {
+                for entry in statuses.iter() {
+                    let status = entry.status();
+                    if status.contains(git2::STATUS_WT_NEW) {
+                        untracked += 1;
+                    } else if status.intersects(modified_flags) {
+                        modified += 1;
+                    } else if status.intersects(uncommitted_flags) {
+                        uncommitted += 1;
+                    } else {
+                        panic!("encountered unexpected status type");
+                    }
+                }
+                println!("uncommitted: {}", uncommitted);
+                println!("modified: {}", modified);
+                println!("untracked: {}", untracked);
+            } else {
+                panic!("failed to get status info from: {:?}", repo.path());
+            };
+        }
     }
 }
