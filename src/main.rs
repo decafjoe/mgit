@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::{App, Arg, SubCommand};
-use git2::{Repository, StatusOptions, StatusShow};
+use git2::{Branch, BranchType, Repository, StatusOptions, StatusShow};
 use ini::Ini;
 use walkdir::WalkDir;
 
@@ -160,11 +160,26 @@ fn status(config: &HashMap<String, Repository>) {
                         panic!("encountered unexpected status type");
                     }
                 }
-                println!("uncommitted: {}", uncommitted);
-                println!("modified: {}", modified);
-                println!("untracked: {}", untracked);
             } else {
                 panic!("failed to get status info from: {:?}", repo.path());
+            };
+
+            let mut branch_status: Vec<(Branch, usize, usize)> = Vec::new();
+            if let Ok(branches) = repo.branches(Some(BranchType::Local)) {
+                for branch_result in branches {
+                    if let Ok((local, _)) = branch_result {
+                        if let Ok(upstream) = local.upstream() {
+                            if let Some(l_oid) = local.get().target() {
+                                if let Some(u_oid) = upstream.get().target() {
+                                    // ok, nesting level = ridonkulous
+                                    // time to pause and learn some more?
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                panic!("failed to get branch info from: {:?}", repo.path());
             };
         }
     }
