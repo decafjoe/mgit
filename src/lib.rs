@@ -1,6 +1,7 @@
 extern crate ansi_term;
 #[macro_use]
 extern crate clap;
+extern crate git2;
 extern crate ini;
 
 mod cfg;

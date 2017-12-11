@@ -1,8 +1,11 @@
+use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter, Result as FormatResult};
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 
+use git2::Repository;
 use ini::Ini;
 
 
@@ -77,13 +80,61 @@ impl Error {
 }
 
 
+// ----- Repo -----------------------------------------------------------------
+
+pub struct Repo {
+    name: String,
+    repo: Repository,
+}
+
+impl Repo {
+    fn new(name: &str, repo: Repository) -> Repo {
+        Repo {
+            name: name.to_owned(),
+            repo: repo,
+        }
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+
+// ----- Group ----------------------------------------------------------------
+
+pub struct Group {
+    name: String,
+    path: String,
+    repos: HashMap<String, Repo>,
+    symbol: String,
+}
+
+impl Group {
+    fn new(name: &str, path: &str, symbol: &str) -> Group {
+        Group {
+            name: name.to_owned(),
+            path: path.to_owned(),
+            repos: HashMap::new(),
+            symbol: symbol.to_owned(),
+        }
+    }
+
+    fn add(&mut self, repo: Repo) {
+        self.repos.insert(repo.name().to_owned(), repo);
+    }
+}
+
+
 // ----- Config ---------------------------------------------------------------
 
-pub struct Config;
+pub struct Config {
+    groups: HashMap<String, Group>,
+}
 
 impl Config {
     pub fn new() -> Config {
-        Config{}
+        Config{ groups: HashMap::new() }
     }
 
     pub fn push(&mut self, path: &str) -> Result<(), Error> {
@@ -106,6 +157,33 @@ impl Config {
             Err(e) => return Err(warning(&path, &e, "could not parse file")),
         };
 
+        let stem = match Path::new(path).file_stem() {
+            Some(stem) => stem.to_str().unwrap(),
+            None => panic!("expected there to be a file_stem for path"),
+        };
+
+        let name = ini.get_from_or(Some("group"), "name", stem);
+        let symbol = ini.get_from_or(Some("group") , "symbol", "•");
+
+        if let Some(group) = self.groups.get(name) {
+            return Err(Error::fatal(&path, &format!(
+                "group name {} already (other file: {})", name, group.path)))
+        }
+
+        let mut group = Group::new(&name, &path, &symbol);
+
+        let mut failed: Vec<String> = Vec::new();
+        if let Some(repos_sec) = ini.section(Some("repos")) {
+            for (name, path) in repos_sec.iter() {
+                if let Ok(repo) = Repository::open(path) {
+                    group.add(Repo::new(&name, repo));
+                } else {
+                    failed.push(path.to_owned());
+                };
+            }
+        }
+
+        self.groups.insert(name.to_owned(), group);
         Ok(())
     }
 }
