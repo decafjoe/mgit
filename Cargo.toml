@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Joe Joyce <joe@decafjoe.com>"]
 
 [dependencies]
+ansi_term = "~0.10.2"
 git2 = "~0.6.8"
 rust-ini = "~0.10.0"
 walkdir = "~2.0.1"
