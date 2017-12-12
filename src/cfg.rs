@@ -9,37 +9,17 @@ use git2::Repository;
 use ini::Ini;
 
 
-// ----- ErrorKind ------------------------------------------------------------
-
-#[derive(Debug, PartialEq)]
-pub enum ErrorKind {
-    Fatal,
-    Warning,
-}
-
-impl Display for ErrorKind {
-    fn fmt(&self, f: &mut Formatter) -> FormatResult {
-        write!(f, "{}", match *self {
-            ErrorKind::Fatal => "fatal",
-            ErrorKind::Warning => "warning",
-        })
-    }
-}
-
-
 // ----- Error ----------------------------------------------------------------
 
 #[derive(Debug)]
 pub struct Error {
-    kind: ErrorKind,
     message: String,
     path: String,
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> FormatResult {
-        write!(f, "{}: in {}: {}", self.kind, self.message.as_str(),
-               self.path.as_str())
+        write!(f, "{}: {}", self.message.as_str(), self.path.as_str())
     }
 }
 
@@ -50,24 +30,8 @@ impl StdError for Error {
 }
 
 impl Error {
-    fn fatal(path: &str, message: &str) -> Error {
-        Error {
-            kind: ErrorKind::Fatal,
-            message: message.to_owned(),
-            path: path.to_owned(),
-        }
-    }
-
-    fn warning(path: &str, message: &str) -> Error {
-        Error {
-            kind: ErrorKind::Warning,
-            message: message.to_owned(),
-            path: path.to_owned(),
-        }
-    }
-
-    pub fn kind(&self) -> &ErrorKind {
-        &self.kind
+    fn new(path: &str, message: &str) -> Error {
+        Error{ message: message.to_owned(), path: path.to_owned() }
     }
 
     pub fn message(&self) -> &str {
@@ -83,20 +47,37 @@ impl Error {
 // ----- Repo -----------------------------------------------------------------
 
 pub struct Repo {
+    config_path: String,
+    symbol: String,
     name: String,
     repo: Repository,
 }
 
 impl Repo {
-    fn new(name: &str, repo: Repository) -> Repo {
+    fn new(config_path: &str, symbol: &str, name: &str, repo: Repository)
+           -> Repo {
         Repo {
+            config_path: config_path.to_owned(),
             name: name.to_owned(),
             repo: repo,
+            symbol: symbol.to_owned(),
         }
     }
 
-    fn name(&self) -> &str {
+    pub fn git(&self) -> &Repository {
+        &self.repo
+    }
+
+    pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn symbol(&self) -> &str {
+        &self.symbol
+    }
+
+    pub fn set_symbol(&mut self, symbol: &str) {
+        self.symbol = symbol.to_owned();
     }
 }
 
@@ -105,23 +86,34 @@ impl Repo {
 
 pub struct Group {
     name: String,
-    path: String,
     repos: HashMap<String, Repo>,
     symbol: String,
 }
 
 impl Group {
-    fn new(name: &str, path: &str, symbol: &str) -> Group {
+    fn new(name: &str, symbol: &str) -> Group {
         Group {
             name: name.to_owned(),
-            path: path.to_owned(),
             repos: HashMap::new(),
             symbol: symbol.to_owned(),
         }
     }
 
-    fn repo_count(&self) -> usize {
-        self.repos.len()
+    pub fn repos(&self) -> &HashMap<String, Repo> {
+        &self.repos
+    }
+
+    pub fn symbol(&self) -> &str {
+        &self.symbol
+    }
+
+    pub fn set_symbol(&mut self, symbol: &str) {
+        if symbol != self.symbol {
+            self.symbol = symbol.to_owned();
+            for (_, repo) in self.repos.iter_mut() {
+                repo.set_symbol(symbol)
+            }
+        }
     }
 
     fn push(&mut self, repo: Repo) {
@@ -141,6 +133,10 @@ impl Config {
         Config{ groups: HashMap::new() }
     }
 
+    pub fn groups(&self) -> &HashMap<String, Group> {
+        &self.groups
+    }
+
     pub fn group_count(&self) -> usize {
         self.groups.len()
     }
@@ -148,14 +144,14 @@ impl Config {
     pub fn repo_count(&self) -> usize {
         let mut rv = 0;
         for (_, group) in &self.groups {
-            rv += group.repo_count();
+            rv += group.repos().len();
         }
         rv
     }
 
-    pub fn push(&mut self, path: &str) -> Result<(), Error> {
-        fn warning(path: &str, e: &StdError, message: &str) -> Error {
-            Error::warning(&path, &format!("{} ({})", message, e))
+    pub fn push(&mut self, path: &str) -> Result<(), Vec<Error>> {
+        fn warning(path: &str, e: &StdError, message: &str) -> Vec<Error> {
+            vec![Error::new(&path, &format!("{} ({})", message, e))]
         }
 
         let mut f = match File::open(path) {
@@ -180,39 +176,41 @@ impl Config {
 
         let name = ini.get_from_or(Some("group"), "name", stem);
         let symbol = ini.get_from_or(Some("group") , "symbol", "•");
+        let group = self.groups.entry(name.to_owned())
+            .or_insert(Group::new(&name, &symbol));
 
-        if let Some(group) = self.groups.get(name) {
-            return Err(Error::fatal(&path, &format!(
-                "group name {} already in use (other file: {})", name,
-                group.path)))
+        if let Some(symbol) = ini.get_from(Some("group"), "symbol") {
+            group.set_symbol(symbol);
+        }
+        let symbol = group.symbol().to_owned();
+
+        let mut existing: HashMap<String, String> = HashMap::new();
+        for (name, repo) in group.repos().iter() {
+            existing.insert(name.to_owned(), repo.config_path.to_owned());
         }
 
-        let mut group = Group::new(&name, &path, &symbol);
-
-        let mut failed: Vec<(String, String, String)> = Vec::new();
-        if let Some(repos_sec) = ini.section(Some("repos")) {
-            for (name, path) in repos_sec.iter() {
-                match Repository::open(path) {
-                    Ok(repo) => group.push(Repo::new(&name, repo)),
-                    Err(e) => failed.push(
-                        (name.to_owned(), path.to_owned(), format!("{}", e))),
+        let mut warnings = Vec::new();
+        if let Some(repos) = ini.section(Some("repos")) {
+            for (name, p) in repos.iter() {
+                match Repository::open(p) {
+                    Ok(repo) => {
+                        group.push(Repo::new(&path, &symbol, &name, repo));
+                        if existing.contains_key(name) {
+                            warnings.push(Error::new(&path, &format!(
+                                "\"{}\" overrides repo of the same name from \
+                                 {}", name, existing.get(name).unwrap())));
+                        }
+                    },
+                    Err(e) => warnings.push(Error::new(&path, &format!(
+                        "failed to open repo \"{}\" at {} ({})", name, p, e))),
                 }
             }
         }
 
-        if failed.len() == 1 {
-            return Err(Error::warning(&path, &format!(
-                "failed to read repo {} ({})", failed[0].0, failed[0].2)))
-        } else if failed.len() > 1 {
-            let csv = failed
-                .iter().map(|x| x.0.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
-            return Err(Error::warning(&path, &format!(
-                "failed to read multiple repos ({})", csv)));
+        if warnings.len() > 0 {
+            Err(warnings)
+        } else {
+            Ok(())
         }
-
-        self.groups.insert(name.to_owned(), group);
-        Ok(())
     }
 }

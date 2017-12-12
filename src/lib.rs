@@ -16,7 +16,7 @@ use ansi_term::Color::{Red, Yellow};
 use clap::{App, Arg, SubCommand};
 use walkdir::WalkDir;
 
-use cfg::{Config, ErrorKind};
+use cfg::Config;
 use cmd::pull;
 use cmd::status;
 
@@ -46,7 +46,6 @@ pub fn main() {
 
     let w = !matches.is_present(QUIET_ARG);
 
-    let mut fatal = false;
     let mut config = Config::new();
     for p in matches.values_of(CONFIG_ARG).unwrap().collect::<Vec<_>>() {
         let path = if p.starts_with("~/") {
@@ -64,25 +63,21 @@ pub fn main() {
         let path_str = path.to_str().unwrap();
         if path.exists() {
             if path.is_file() {
-                if read_file(w, &mut config, path_str) {
-                    fatal = true;
-                }
+                read_config_file(w, &mut config, path_str);
             } else if path.is_dir() {
                 for entry in WalkDir::new(&path) {
                     if let Ok(entry) = entry {
                         let path_str = entry.path().to_str().unwrap();
                         if let Ok(metadata) = entry.metadata() {
                             if metadata.is_file() {
-                                if read_file(w, &mut config, path_str) {
-                                    fatal = true;
-                                }
+                                read_config_file(w, &mut config, path_str);
                             }
                         } else {
                             print_warning(w, &format!(
                                 "failed to get metadata for {}", path_str));
                         }
+                    }
                 }
-            }
             } else {
                 print_warning(w, &format!(
                     "{} not a file or directory, or could not be read",
@@ -93,15 +88,18 @@ pub fn main() {
                 "{} does not exist or could not be read", path_str));
         }
     }
-    if fatal {
-        process::exit(1);
-    }
 
+    let mut fatal = false;
     if config.group_count() < 1 {
-        print_warning(w, "no configuration files were read");
+        print_error("no configuration files were read");
+        fatal = true;
     }
     if config.repo_count() < 1 {
-        print_warning(w, "no repositories configured");
+        print_error("no repositories configured");
+        fatal = true;
+    }
+    if fatal {
+        process::exit(1);
     }
 
     if let Some(matches) = matches.subcommand_matches(pull::NAME) {
@@ -114,21 +112,12 @@ pub fn main() {
     }
 }
 
-fn read_file(warnings: bool, config: &mut Config, path: &str) -> bool {
-    if let Err(e) = config.push(&path) {
-        match *e.kind() {
-            ErrorKind::Fatal => {
-                print_error(&format!("({}) {}", e.path(), e.message()));
-                true
-            },
-            ErrorKind::Warning => {
-                print_warning(warnings, &format!(
-                    "({}) {}", e.path(), e.message()));
-                false
-            }
+fn read_config_file(warnings: bool, config: &mut Config, path: &str) {
+    if let Err(errs) = config.push(&path) {
+        for e in errs {
+            print_warning(warnings, &format!(
+                "({}) {}", e.path(), e.message()));
         }
-    } else {
-        false
     }
 }
 
