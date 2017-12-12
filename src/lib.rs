@@ -24,7 +24,7 @@ const CONFIG_ARG: &str = "CONFIG";
 const QUIET_ARG: &str = "QUIET";
 
 pub fn main() {
-    let app = App::new("mgit")
+    let matches = App::new("mgit")
         .version(crate_version!())
         .author(crate_authors!())
         .about("Small program for managing multiple git repositories.")
@@ -39,17 +39,11 @@ pub fn main() {
         .arg(Arg::with_name(QUIET_ARG)
              .help("Suppresses warning messages")
              .short("q")
-             .long("quiet"));
+             .long("quiet"))
+        .subcommand(pull::app())
+        .subcommand(status::app())
+        .get_matches();
 
-    let subcommand = SubCommand::with_name(pull::NAME).about(pull::ABOUT);
-    pull::setup(&subcommand);
-    let app = app.subcommand(subcommand);
-
-    let subcommand = SubCommand::with_name(status::NAME).about(status::ABOUT);
-    status::setup(&subcommand);
-    let app = app.subcommand(subcommand);
-
-    let matches = app.get_matches();
     let w = !matches.is_present(QUIET_ARG);
 
     let mut fatal = false;
