@@ -42,19 +42,26 @@ pub fn main() {
 
     let matches = app.get_matches();
 
-    let error = Red.bold().paint("error");
-    let warning = Yellow.bold().paint("warning");
+    let error_prefix = Red.bold().paint("  error ");
+    let error = |msg: &str| {
+        eprintln!("{}{}", error_prefix, msg);
+    };
+
+    let warning_prefix = Yellow.bold().paint("warning ");
+    let warning = |msg: &str| {
+        eprintln!("{}{}", warning_prefix, msg);
+    };
 
     let mut config = Config::new();
     for path in matches.values_of(CONFIG_ARG).unwrap().collect::<Vec<&str>>() {
         if let Err(e) = config.push(&path) {
             match *e.kind() {
                 ErrorKind::Fatal => {
-                    eprintln!("{}: {}: {}", error, e.path(), e.message());
+                    error(&format!("({}) {}", e.path(), e.message()));
                     process::exit(1);
                 },
                 ErrorKind::Warning => {
-                    eprintln!("{}: {}: {}", warning, e.path(), e.message());
+                    warning(&format!("({}) {}", e.path(), e.message()));
                 }
             }
         }
@@ -65,7 +72,7 @@ pub fn main() {
     } else if let Some(matches) = matches.subcommand_matches(status::NAME) {
         status::run(&config, &matches);
     } else {
-        println!("no command suppled, see `mgit --help` for usage info");
+        error("no command supplied, see `mgit --help` for usage info");
         process::exit(1);
     }
 }
