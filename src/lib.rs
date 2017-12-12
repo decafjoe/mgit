@@ -34,9 +34,11 @@ pub fn main() {
 
     let subcommand = SubCommand::with_name(pull::NAME).about(pull::ABOUT);
     pull::setup(&subcommand);
+    let app = app.subcommand(subcommand);
 
     let subcommand = SubCommand::with_name(status::NAME).about(status::ABOUT);
     status::setup(&subcommand);
+    let app = app.subcommand(subcommand);
 
     let matches = app.get_matches();
 
