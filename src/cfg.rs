@@ -120,7 +120,11 @@ impl Group {
         }
     }
 
-    fn add(&mut self, repo: Repo) {
+    fn repo_count(&self) -> usize {
+        self.repos.len()
+    }
+
+    fn push(&mut self, repo: Repo) {
         self.repos.insert(repo.name().to_owned(), repo);
     }
 }
@@ -135,6 +139,18 @@ pub struct Config {
 impl Config {
     pub fn new() -> Config {
         Config{ groups: HashMap::new() }
+    }
+
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    pub fn repo_count(&self) -> usize {
+        let mut rv = 0;
+        for (_, group) in &self.groups {
+            rv += group.repo_count();
+        }
+        rv
     }
 
     pub fn push(&mut self, path: &str) -> Result<(), Error> {
@@ -167,7 +183,8 @@ impl Config {
 
         if let Some(group) = self.groups.get(name) {
             return Err(Error::fatal(&path, &format!(
-                "group name {} already (other file: {})", name, group.path)))
+                "group name {} already in use (other file: {})", name,
+                group.path)))
         }
 
         let mut group = Group::new(&name, &path, &symbol);
@@ -176,7 +193,7 @@ impl Config {
         if let Some(repos_sec) = ini.section(Some("repos")) {
             for (name, path) in repos_sec.iter() {
                 match Repository::open(path) {
-                    Ok(repo) => group.add(Repo::new(&name, repo)),
+                    Ok(repo) => group.push(Repo::new(&name, repo)),
                     Err(e) => failed.push(
                         (name.to_owned(), path.to_owned(), format!("{}", e))),
                 }
