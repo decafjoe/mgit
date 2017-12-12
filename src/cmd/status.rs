@@ -1,4 +1,4 @@
-use clap::{App, Arg, ArgMatches};
+use clap::{App, Arg, ArgMatches, SubCommand};
 
 use cfg::Config;
 
@@ -8,8 +8,8 @@ pub const ABOUT: &str = "Print status summary for each repo";
 const GROUP_ARG: &str = "GROUP";
 const VERBOSE_ARG: &str = "VERBOSE";
 
-pub fn app<'a>() -> App<'a, 'a> {
-    App::new(NAME)
+pub fn subcommand<'a>() -> App<'a, 'a> {
+    SubCommand::with_name(NAME)
         .about(ABOUT)
         .arg(Arg::with_name(GROUP_ARG)
             .help("Separates output by group (default is a merged list)")

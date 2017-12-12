@@ -40,8 +40,8 @@ pub fn main() {
              .help("Suppresses warning messages")
              .short("q")
              .long("quiet"))
-        .subcommand(pull::app())
-        .subcommand(status::app())
+        .subcommand(pull::subcommand())
+        .subcommand(status::subcommand())
         .get_matches();
 
     let w = !matches.is_present(QUIET_ARG);
