@@ -17,6 +17,7 @@ use cmd::pull;
 use cmd::status;
 
 const CONFIG_ARG: &str = "CONFIG";
+const QUIET_ARG: &str = "QUIET";
 
 pub fn main() {
     let app = App::new("mgit")
@@ -30,7 +31,11 @@ pub fn main() {
              .long("config")
              .multiple(true)
              .number_of_values(1)
-             .value_name("PATH"));
+             .value_name("PATH"))
+        .arg(Arg::with_name(QUIET_ARG)
+             .help("Suppresses warning messages")
+             .short("q")
+             .long("quiet"));
 
     let subcommand = SubCommand::with_name(pull::NAME).about(pull::ABOUT);
     pull::setup(&subcommand);
@@ -49,7 +54,9 @@ pub fn main() {
 
     let warning_prefix = Yellow.bold().paint("warning ");
     let warning = |msg: &str| {
-        eprintln!("{}{}", warning_prefix, msg);
+        if !matches.is_present(QUIET_ARG) {
+            eprintln!("{}{}", warning_prefix, msg);
+        }
     };
 
     let mut config = Config::new();
