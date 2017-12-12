@@ -172,15 +172,27 @@ impl Config {
 
         let mut group = Group::new(&name, &path, &symbol);
 
-        let mut failed: Vec<String> = Vec::new();
+        let mut failed: Vec<(String, String, String)> = Vec::new();
         if let Some(repos_sec) = ini.section(Some("repos")) {
             for (name, path) in repos_sec.iter() {
-                if let Ok(repo) = Repository::open(path) {
-                    group.add(Repo::new(&name, repo));
-                } else {
-                    failed.push(path.to_owned());
-                };
+                match Repository::open(path) {
+                    Ok(repo) => group.add(Repo::new(&name, repo)),
+                    Err(e) => failed.push(
+                        (name.to_owned(), path.to_owned(), format!("{}", e))),
+                }
             }
+        }
+
+        if failed.len() == 1 {
+            return Err(Error::warning(&path, &format!(
+                "failed to read repo {} ({})", failed[0].0, failed[0].2)))
+        } else if failed.len() > 1 {
+            let csv = failed
+                .iter().map(|x| x.0.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(Error::warning(&path, &format!(
+                "failed to read multiple repos ({})", csv)));
         }
 
         self.groups.insert(name.to_owned(), group);
