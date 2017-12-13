@@ -48,16 +48,19 @@ impl Error {
 
 pub struct Repo {
     config_path: String,
+    group_name: String,
     symbol: String,
     name: String,
     repo: Repository,
 }
 
 impl Repo {
-    fn new(config_path: &str, symbol: &str, name: &str, repo: Repository)
+    fn new(config_path: &str, group_name: &str, symbol: &str, name: &str,
+           repo: Repository)
            -> Repo {
         Repo {
             config_path: config_path.to_owned(),
+            group_name: group_name.to_owned(),
             name: name.to_owned(),
             repo: repo,
             symbol: symbol.to_owned(),
@@ -174,10 +177,10 @@ impl Config {
             None => panic!("expected there to be a file_stem for path"),
         };
 
-        let name = ini.get_from_or(Some("group"), "name", stem);
+        let group_name = ini.get_from_or(Some("group"), "name", stem);
         let symbol = ini.get_from_or(Some("group") , "symbol", "•");
-        let group = self.groups.entry(name.to_owned())
-            .or_insert(Group::new(&name, &symbol));
+        let group = self.groups.entry(group_name.to_owned())
+            .or_insert(Group::new(&group_name, &symbol));
 
         if let Some(symbol) = ini.get_from(Some("group"), "symbol") {
             group.set_symbol(symbol);
@@ -194,7 +197,8 @@ impl Config {
             for (name, p) in repos.iter() {
                 match Repository::open(p) {
                     Ok(repo) => {
-                        group.push(Repo::new(&path, &symbol, &name, repo));
+                        group.push(Repo::new(
+                            &path, &group_name, &symbol, &name, repo));
                         if existing.contains_key(name) {
                             warnings.push(Error::new(&path, &format!(
                                 "\"{}\" overrides repo of the same name from \
