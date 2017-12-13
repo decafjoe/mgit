@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::process;
 
 use ansi_term::Color::{Red, Yellow};
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg};
 use walkdir::WalkDir;
 
 use cfg::Config;
