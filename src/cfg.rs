@@ -88,18 +88,13 @@ impl Repo {
 // ----- Group ----------------------------------------------------------------
 
 pub struct Group {
-    name: String,
     repos: HashMap<String, Repo>,
     symbol: String,
 }
 
 impl Group {
-    fn new(name: &str, symbol: &str) -> Group {
-        Group {
-            name: name.to_owned(),
-            repos: HashMap::new(),
-            symbol: symbol.to_owned(),
-        }
+    fn new(symbol: &str) -> Group {
+        Group { repos: HashMap::new(), symbol: symbol.to_owned() }
     }
 
     pub fn repos(&self) -> &HashMap<String, Repo> {
@@ -180,7 +175,7 @@ impl Config {
         let group_name = ini.get_from_or(Some("group"), "name", stem);
         let symbol = ini.get_from_or(Some("group") , "symbol", "•");
         let group = self.groups.entry(group_name.to_owned())
-            .or_insert(Group::new(&group_name, &symbol));
+            .or_insert(Group::new(&symbol));
 
         if let Some(symbol) = ini.get_from(Some("group"), "symbol") {
             group.set_symbol(symbol);
