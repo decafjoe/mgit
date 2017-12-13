@@ -3,6 +3,7 @@ extern crate ansi_term;
 extern crate clap;
 extern crate git2;
 extern crate ini;
+extern crate pager;
 extern crate walkdir;
 
 mod cfg;
