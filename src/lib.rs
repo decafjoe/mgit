@@ -8,6 +8,7 @@ extern crate walkdir;
 
 mod cfg;
 mod cmd;
+mod wt;
 
 use std::env;
 use std::path::PathBuf;

@@ -1,15 +1,65 @@
 use std::cmp::Ordering;
 
 use ansi_term::Style;
+use ansi_term::Color::{Green, Red, Yellow};
 use clap::{App, Arg, ArgMatches, SubCommand};
+use git2::Error;
 use pager::Pager;
 
 use cfg::{Config, Repo};
+use wt::Worktree;
 
 pub const NAME: &str = "status";
 
 const GROUP_ARG: &str = "GROUP";
 const VERBOSE_ARG: &str = "VERBOSE";
+
+#[derive(Clone, PartialEq, PartialOrd)]
+enum Severity {
+    Info,
+    Notice,
+    Warning,
+}
+
+struct Note {
+    content: String,
+    severity: Severity,
+}
+
+impl Note {
+    pub fn new(severity: Severity, content: &str) -> Note {
+        Note{ content: content.to_owned(), severity: severity }
+    }
+
+    pub fn severity(&self) -> &Severity {
+        &self.severity
+    }
+}
+
+struct Summary {
+    notes: Vec<Note>,
+}
+
+impl Summary {
+    pub fn new() -> Summary {
+        Summary{ notes: Vec::new() }
+    }
+
+    pub fn add_note(&mut self, severity: Severity, content: &str) {
+        self.notes.push(Note::new(severity, content));
+    }
+
+    pub fn most_severe(&self) -> Severity {
+        let mut rv = Severity::Info;
+        for note in &self.notes {
+            let s = note.severity();
+            if *s > rv {
+                rv = s.clone();
+            }
+        }
+        rv
+    }
+}
 
 pub fn subcommand<'a>() -> App<'a, 'a> {
     SubCommand::with_name(NAME)
@@ -39,7 +89,7 @@ pub fn run(config: &Config, matches: &ArgMatches) {
             let mut names = repos.keys().collect::<Vec<&String>>();
             names.sort();
             for name in names {
-                print_status(verbose, repos.get(name).unwrap());
+                print_status(repos.get(name).unwrap(), verbose, false);
             }
         }
     } else {
@@ -57,12 +107,53 @@ pub fn run(config: &Config, matches: &ArgMatches) {
             }
         });
         for (_, _, repo) in repos {
-            print_status(verbose, repo);
+            print_status(repo, verbose, false);
         }
     }
     println!();
 }
 
-fn print_status(verbose: bool, repo: &Repo) {
-    println!("{}", repo.name());
+fn add_wt_note(summary: &mut Summary, desc: &str, nr: Result<usize, Error>) {
+    let n = nr.expect(&format!("failed to get {} count", desc));
+    let sev = match n {
+        0 => Severity::Info,
+        _ => Severity::Warning,
+    };
+    let (files, are) = match n {
+        1 => ("file", "is"),
+        _ => ("files", "are"),
+    };
+    summary.add_note(sev, &format!("{} {} {} {}", n, files, are, desc));
+}
+
+fn print_status(repo: &Repo, verbose: bool, group_name: bool) {
+    let mut summary = Summary::new();
+
+    let wt = Worktree::new(repo.git());
+    add_wt_note(&mut summary, "uncommitted", wt.uncommitted());
+    add_wt_note(&mut summary, "modified", wt.modified());
+    add_wt_note(&mut summary, "untracked", wt.untracked());
+
+    // TODO(jjoyce): add notes to the summary for each tracking branch
+
+    let color = match summary.most_severe() {
+        Severity::Info => Green,
+        Severity::Notice => Yellow,
+        Severity::Warning => Red,
+    };
+    let group = if verbose || group_name {
+        format!(" ({})", repo.group_name())
+    } else {
+        "".to_owned()
+    };
+    let path = if verbose {
+        format!(" {}", repo.path())
+    } else {
+        "".to_owned()
+    };
+    println!("{} {}{}{}",
+             color.bold().paint(repo.symbol()),
+             color.bold().paint(repo.name()),
+             color.paint(group),
+             path);
 }

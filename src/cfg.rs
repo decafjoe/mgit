@@ -71,8 +71,18 @@ impl Repo {
         &self.repo
     }
 
+    pub fn group_name(&self) -> &str {
+        &self.group_name
+    }
+
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn path(&self) -> &str {
+        &self.repo.path()
+            .parent().expect("failed to get parent of .git path")
+            .to_str().expect("failed to cast repo path to string")
     }
 
     pub fn symbol(&self) -> &str {
