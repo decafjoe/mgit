@@ -31,6 +31,10 @@ impl Note {
         Note{ content: content.to_owned(), severity: severity }
     }
 
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
     pub fn severity(&self) -> &Severity {
         &self.severity
     }
@@ -45,11 +49,15 @@ impl Summary {
         Summary{ notes: Vec::new() }
     }
 
+    pub fn notes(&self) -> &Vec<Note> {
+        &self.notes
+    }
+
     pub fn add_note(&mut self, severity: Severity, content: &str) {
         self.notes.push(Note::new(severity, content));
     }
 
-    pub fn most_severe(&self) -> Severity {
+    pub fn severity(&self) -> Severity {
         let mut rv = Severity::Info;
         for note in &self.notes {
             let s = note.severity();
@@ -107,36 +115,39 @@ pub fn run(config: &Config, matches: &ArgMatches) {
             }
         });
         for (_, _, repo) in repos {
+            // TODO(jjoyce): group = true if there are multiple repos with the
+            //               same name
             print_status(repo, verbose, false);
         }
     }
     println!();
 }
 
-fn add_wt_note(summary: &mut Summary, desc: &str, nr: Result<usize, Error>) {
+fn add_wt_files_note(summary: &mut Summary, desc: &str,
+                     nr: Result<usize, Error>) {
     let n = nr.expect(&format!("failed to get {} count", desc));
     let sev = match n {
         0 => Severity::Info,
         _ => Severity::Warning,
     };
-    let (files, are) = match n {
-        1 => ("file", "is"),
-        _ => ("files", "are"),
+    let files = match n {
+        1 => "file is",
+        _ => "files are",
     };
-    summary.add_note(sev, &format!("{} {} {} {}", n, files, are, desc));
+    summary.add_note(sev, &format!("{} {} {}", n, files, desc));
 }
 
 fn print_status(repo: &Repo, verbose: bool, group_name: bool) {
     let mut summary = Summary::new();
 
     let wt = Worktree::new(repo.git());
-    add_wt_note(&mut summary, "uncommitted", wt.uncommitted());
-    add_wt_note(&mut summary, "modified", wt.modified());
-    add_wt_note(&mut summary, "untracked", wt.untracked());
+    add_wt_files_note(&mut summary, "uncommitted", wt.uncommitted());
+    add_wt_files_note(&mut summary, "modified", wt.modified());
+    add_wt_files_note(&mut summary, "untracked", wt.untracked());
 
     // TODO(jjoyce): add notes to the summary for each tracking branch
 
-    let color = match summary.most_severe() {
+    let color = match summary.severity() {
         Severity::Info => Green,
         Severity::Notice => Yellow,
         Severity::Warning => Red,
@@ -147,7 +158,7 @@ fn print_status(repo: &Repo, verbose: bool, group_name: bool) {
         "".to_owned()
     };
     let path = if verbose {
-        format!(" {}", repo.path())
+        format!(" \n  • {}", repo.path())
     } else {
         "".to_owned()
     };
@@ -156,4 +167,14 @@ fn print_status(repo: &Repo, verbose: bool, group_name: bool) {
              color.bold().paint(repo.name()),
              color.paint(group),
              path);
+    for note in summary.notes() {
+        let style = match (verbose, note.severity()) {
+            (false, _) | (true, &Severity::Info) => Style::new(),
+            (true, &Severity::Notice) => Yellow.normal(),
+            (true, &Severity::Warning) => Red.normal(),
+        };
+        if verbose || *note.severity() != Severity::Info {
+            println!("{}", style.paint(format!("  → {}", note.content())));
+        }
+    }
 }
