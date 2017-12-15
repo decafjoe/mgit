@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use ansi_term::Style;
 use ansi_term::Color::{Green, Red, Yellow};
 use clap::{App, Arg, ArgMatches, SubCommand};
-use git2::Error;
+use git2::{BranchType, Error};
 use pager::Pager;
 
 use cfg::{Config, Repo};
@@ -139,13 +139,51 @@ fn add_wt_files_note(summary: &mut Summary, desc: &str,
 
 fn print_status(repo: &Repo, verbose: bool, group_name: bool) {
     let mut summary = Summary::new();
+    let git = repo.git();
 
-    let wt = Worktree::new(repo.git());
+    let wt = Worktree::new(git);
     add_wt_files_note(&mut summary, "uncommitted", wt.uncommitted());
     add_wt_files_note(&mut summary, "modified", wt.modified());
     add_wt_files_note(&mut summary, "untracked", wt.untracked());
 
-    // TODO(jjoyce): add notes to the summary for each tracking branch
+    let branches = git.branches(Some(BranchType::Local))
+        .expect("failed to get branch info from repo");
+    for branch_result in branches {
+        if let Ok((local, _)) = branch_result {
+            if let Ok(upstream) = local.upstream() {
+                let l_name = local.name()
+                    .expect("failed to get local branch name")
+                    .expect("local branch name is not valid utf-8");
+                let l_oid = local.get().target()
+                    .expect("failed to get local oid");
+                let u_name = upstream.name()
+                    .expect("failed to get upstream branch name")
+                    .expect("upstream branch name is not valid utf-8");
+                let u_oid = upstream.get().target()
+                    .expect("failed to get upstream oid");
+                let (ahead, behind) = git.graph_ahead_behind(l_oid, u_oid)
+                    .expect("failed to determine relationship between oids");
+                if ahead > 0 && behind > 0 {
+                    summary.add_note(Severity::Warning, &format!(
+                        "{} has diverged from {} ({} and {} commits)",
+                        l_name, u_name, ahead, behind));
+                } else if ahead > 0 {
+                    let s = match ahead { 1 => "", _ => "s" };
+                    summary.add_note(Severity::Notice, &format!(
+                        "{} is ahead of {} by {} commit{}",
+                        l_name, u_name, ahead, s));
+                } else if behind > 0 {
+                    let s = match ahead { 1 => "", _ => "s" };
+                    summary.add_note(Severity::Warning, &format!(
+                        "{} is behind {} by {} commit{}",
+                        l_name, u_name, behind, s));
+                } else {
+                    summary.add_note(Severity::Info, &format!(
+                        "{} is up to date with {}", l_name, u_name));
+                }
+            }
+        }
+    }
 
     let color = match summary.severity() {
         Severity::Info => Green,
