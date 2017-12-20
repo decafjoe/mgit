@@ -3,6 +3,10 @@ name = "mgit"
 version = "0.2.0"
 authors = ["Joe Joyce <joe@decafjoe.com>"]
 
+[[bin]]
+name = "mgit"
+doc = false
+
 [dependencies]
 # ansi_term = "~0.10.2"
 # git2 = "~0.6.8"

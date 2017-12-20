@@ -1,19 +1,42 @@
+//! Filesystem path utilities.
+
 use std::path::{MAIN_SEPARATOR, PathBuf};
 
 use users::{get_current_uid, get_user_by_name, get_user_by_uid};
 use users::os::unix::UserExt;
 
+/// Error type returned from functions in this module.
 #[derive(Debug, PartialEq)]
 pub struct Error {
+    /// Message describing the error.
     message: String,
 }
 
 impl Error {
+    /// Creates and returns a new error struct with the specified
+    /// `message`.
     pub fn new(message: &str) -> Error {
         Error{ message: message.to_owned() }
     }
 }
 
+/// Returns PathBuf for `path`, with leading tildes expanded out to
+/// the appropriate user home directory.
+///
+/// # Panics
+///
+/// The function will panic if for some reason splitting on the
+/// MAIN_SEPARATOR fails to produce any items. This should never be
+/// the case as a split always produces at least one item.
+///
+/// # Errors
+///
+/// `expand` returns an error if:
+///
+/// * `path` is `~` or starts with `~/` and the user info for the uid
+///   running the process cannot be fetched.
+/// * `path` starts with `~example` and the user info for the user
+///   named `example` cannot be fetched.
 pub fn expand(path: &str) -> Result<PathBuf, Error> {
     let sep = MAIN_SEPARATOR;
     if path.starts_with("~") {
