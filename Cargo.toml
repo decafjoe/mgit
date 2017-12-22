@@ -8,7 +8,7 @@ name = "mgit"
 doc = false
 
 [dependencies]
-# ansi_term = "~0.10.2"
+ansi_term = "~0.10.2"
 # git2 = "~0.6.8"
 # pager = "~0.14.0"
 rust-ini = "~0.10.0"
