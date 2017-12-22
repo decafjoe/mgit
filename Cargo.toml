@@ -11,7 +11,7 @@ doc = false
 # ansi_term = "~0.10.2"
 # git2 = "~0.6.8"
 # pager = "~0.14.0"
-# rust-ini = "~0.10.0"
+rust-ini = "~0.10.0"
 users = "~0.6.0"
 # walkdir = "~2.0.1"
 
