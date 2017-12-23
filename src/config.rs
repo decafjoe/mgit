@@ -2,7 +2,7 @@ use std::error::Error as StdError;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use ini::Ini;
 
@@ -30,8 +30,8 @@ impl fmt::Display for Error {
 // ----- Repo -----------------------------------------------------------------
 
 pub struct Repo {
-    config_path: PathBuf,
-    path: PathBuf,
+    config_path: String,
+    path: String,
     name: Option<String>,
     comment: Option<String>,
     symbol: Option<String>,
@@ -54,8 +54,8 @@ impl Repo {
             None => None,
         };
         Self {
-            config_path: PathBuf::from(config_path),
-            path: PathBuf::from(repo_path),
+            config_path: config_path.to_owned(),
+            path: repo_path.to_owned(),
             name: name,
             comment: comment,
             symbol: symbol,
