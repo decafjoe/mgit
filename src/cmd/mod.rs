@@ -1,1 +1,2 @@
+//! Subcommands.
 pub mod config;

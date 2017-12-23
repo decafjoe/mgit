@@ -1,3 +1,4 @@
+//! Library that drives mgit.
 extern crate ansi_term;
 #[macro_use] extern crate clap;
 extern crate ini;
@@ -17,10 +18,14 @@ mod config;
 mod invocation;
 mod path;
 
+/// Argument name for -c/--config.
 const CONFIG_ARG: &str = "CONFIG";
+/// Argument name for -q/--quiet.
 const QUIET_ARG: &str = "QUIET";
+/// Argument name for -w/--warning.
 const WARNING_ARG: &str = "WARNING";
 
+/// Entry point for the program.
 pub fn main() {
     Pager::with_pager("less -efFnrX").setup();
 

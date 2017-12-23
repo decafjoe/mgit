@@ -1,3 +1,4 @@
+//! Configuration parser and API.
 use std::error::Error as StdError;
 use std::fmt;
 use std::fs::File;
@@ -9,11 +10,18 @@ use ini::Ini;
 
 // ----- Error ----------------------------------------------------------------
 
+/// Error type for this module.
+///
+/// Note that underlying errors (e.g. permissions errors) are
+/// "exposed" by adding their message to the `message` string. This is
+/// the responsibility of whoever is constructing the error.
 pub struct Error {
+    /// Message describing the error.
     message: String,
 }
 
 impl Error {
+    /// Returns a new error instance with the specified `message`.
     pub fn new(message: &str) -> Self {
         Self{ message: message.to_owned() }
     }
@@ -29,16 +37,25 @@ impl fmt::Display for Error {
 
 // ----- Repo -----------------------------------------------------------------
 
+/// Configuration for an individual repository.
 pub struct Repo {
+    /// Path to the configuration file in which repo was defined.
     config_path: String,
+    /// Path to the repository itself.
     path: String,
+    /// Optional human friendly-name for the repo.
     name: Option<String>,
+    /// Optional comment describing the repo.
     comment: Option<String>,
+    /// Optional "symbol" for the repo – the character that precedes
+    /// the repo name in status listings.
     symbol: Option<String>,
+    /// Tags associated with the repo.
     tags: Vec<String>,
 }
 
 impl Repo {
+    /// Creates and returns a new Repo object.
     pub fn new(config_path: &str, repo_path: &str, name: Option<&str>,
                comment: Option<&str>, symbol: Option<&str>) -> Self {
         let name = match name {
@@ -63,10 +80,12 @@ impl Repo {
         }
     }
 
+    /// Returns path to the repository as specified by the end user.
     pub fn path(&self) -> &str {
         &self.path
     }
 
+    /// Returns tags for this repository.
     pub fn tags(&self) -> &[String] {
         self.tags.as_slice()
     }
@@ -75,12 +94,18 @@ impl Repo {
 
 // ----- ReposIterator --------------------------------------------------------
 
+/// Iterator over a sequence of repos.
 pub struct ReposIterator<'a> {
+    /// Reference to the config instance containing the repos being
+    /// iterated over.
     config: &'a Config,
+    /// Indices of the repos being iterated over.
     indices: Vec<usize>,
 }
 
 impl<'a> ReposIterator<'a> {
+    /// Creates and returns a new iterator for `config`, which will
+    /// iterate over the repos at `indices`.
     pub fn new(config: &'a Config, indices: &[usize]) -> Self {
         Self{ config: config, indices: indices.to_vec() }
     }
@@ -100,20 +125,58 @@ impl<'a> Iterator for ReposIterator<'a> {
 
 // ----- Config ---------------------------------------------------------------
 
+/// Name config key.
 const NAME_KEY: &str = "name";
+/// Comment config key.
 const COMMENT_KEY: &str = "comment";
+/// Symbol config key.
 const SYMBOL_KEY: &str = "symbol";
+/// Tags config key.
 const TAGS_KEY: &str = "tags";
 
+/// Configuration for the program.
+///
+/// The idea is to `read` configuration files into the config struct,
+/// then fetch them out using the (very crude) API.
+///
+/// Repositories are "keyed" by the path specified by the user in the
+/// config file (i.e. by the thing inside the brackets). The "key" for
+/// `[~/mgit]` is `~/mgit`.
+///
+/// An individual repo can be fetched with the `repo` method, using
+/// the key.
+///
+/// "Lists" of repos can be fetched using `repos_iter` or
+/// `repos_tagged`.
 pub struct Config {
     repos: Vec<Repo>,
 }
 
 impl Config {
+    /// Creates and returns a new configuration object.
     pub fn new() -> Self {
         Config{ repos: Vec::new() }
     }
 
+    /// Reads the file at `path`, returning a vec of errors if there
+    /// are any issues.
+    ///
+    /// Note that, except for "can't read the file" type errors,
+    /// processing will continue if an error is found. In terms of the
+    /// larger program, errors here are more like warnings: something
+    /// is awry and the user should be notified, but processing may
+    /// continue.
+    ///
+    /// # Errors
+    ///
+    /// This call can error out for a number of reasons:
+    ///
+    /// * `path` does not exist or is not a file.
+    /// * File at `path` cannot be opened.
+    /// * File at `path` cannot be read into a string.
+    /// * File at `path` cannot be parsed.
+    /// * Configuration contains repositories that have already been
+    /// defined.
     pub fn read(&mut self, path: &str) -> Result<(), Vec<Error>> {
         fn err(msg: &str) -> Result<(), Vec<Error>> {
             Err(vec![Error::new(msg)])
@@ -166,6 +229,11 @@ impl Config {
         }
     }
 
+    /// Returns `Repo` configuration for repo at `path`.
+    ///
+    /// Note that no computation is done on the path (e.g. expanding
+    /// tildes) -- the `path` must match exactly what the end user
+    /// supplied in the configuration.
     pub fn repo(&self, path: &str) -> Option<&Repo> {
         for repo in self.repos() {
             if path == repo.path() {
@@ -175,15 +243,18 @@ impl Config {
         None
     }
 
+    /// Returns a slice containing configured repos.
     pub fn repos(&self) -> &[Repo] {
         self.repos.as_slice()
     }
 
+    /// Returns an iterator over all configured repos.
     pub fn repos_iter(&self) -> ReposIterator {
         let indices = (0..self.repos.len()).collect::<Vec<_>>();
         ReposIterator::new(self, indices.as_slice())
     }
 
+    /// Returns an iterator over repos with the tag `tag`.
     pub fn repos_tagged(&self, tag: &str) -> ReposIterator {
         let tag = String::from(tag);
         let mut indices = Vec::new();
