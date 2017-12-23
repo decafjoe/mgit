@@ -62,8 +62,41 @@ impl Repo {
             tags: Vec::new(),
         }
     }
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn tags(&self) -> &[String] {
+        self.tags.as_slice()
+    }
 }
 
+
+// ----- ReposIterator --------------------------------------------------------
+
+pub struct ReposIterator<'a> {
+    config: &'a Config,
+    indices: Vec<usize>,
+}
+
+impl<'a> ReposIterator<'a> {
+    pub fn new(config: &'a Config, indices: &[usize]) -> Self {
+        Self{ config: config, indices: indices.to_vec() }
+    }
+}
+
+impl<'a> Iterator for ReposIterator<'a> {
+    type Item = &'a Repo;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.indices.len() > 0 {
+            Some(&self.config.repos()[self.indices.remove(0)])
+        } else {
+            None
+        }
+    }
+}
 
 // ----- Config ---------------------------------------------------------------
 
@@ -113,16 +146,15 @@ impl Config {
         let mut errors = Vec::new();
         for (repo_path, _) in &ini {
             if let Some(repo_path) = repo_path.as_ref() {
+                // TODO(jjoyce): iterate through repos and look for
+                //               another one with the same path?
+                //               could use self.repos() here?
                 self.repos.push(Repo::new(
                     path,
                     repo_path,
                     ini.get_from(Some(repo_path.to_string()), NAME_KEY),
                     ini.get_from(Some(repo_path.to_string()), COMMENT_KEY),
                     ini.get_from(Some(repo_path.to_string()), SYMBOL_KEY)));
-                // TODO(jjoyce): iterate through repos and look for
-                //               another one with the same path?
-                //               should be an immutable borrow, which
-                //               is ok here?
                 // TODO(jjoyce): parse and populate tags
             }
         }
@@ -132,5 +164,34 @@ impl Config {
         } else {
             Ok(())
         }
+    }
+
+    pub fn repo(&self, path: &str) -> Option<&Repo> {
+        for repo in self.repos() {
+            if path == repo.path() {
+                return Some(repo)
+            }
+        }
+        None
+    }
+
+    pub fn repos(&self) -> &[Repo] {
+        self.repos.as_slice()
+    }
+
+    pub fn repos_iter(&self) -> ReposIterator {
+        let indices = (0..self.repos.len()).collect::<Vec<_>>();
+        ReposIterator::new(self, indices.as_slice())
+    }
+
+    pub fn repos_tagged(&self, tag: &str) -> ReposIterator {
+        let tag = String::from(tag);
+        let mut indices = Vec::new();
+        for (i, repo) in self.repos.iter().enumerate() {
+            if repo.tags().contains(&tag) {
+                indices.push(i);
+            }
+        }
+        ReposIterator::new(self, indices.as_slice())
     }
 }
