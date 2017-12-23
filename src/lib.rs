@@ -64,7 +64,14 @@ pub fn main() {
     let mut config = Config::new();
     for path_str in matches.values_of(CONFIG_ARG).unwrap() {
         let path = match path::expand(path_str) {
-            Ok(path_buf) => path_buf,
+            Ok(path_buf) => match path_buf.canonicalize() {
+                Ok(path_buf) => path_buf,
+                Err(e) => {
+                    control.warning(&format!(
+                        "{}: could not canonicalize path ({})", path_str, e));
+                    continue
+                },
+            },
             Err(e) => {
                 control.warning(&format!(
                     "{}: could not resolve path ({})", path_str, e));
@@ -104,9 +111,13 @@ pub fn main() {
                 let p = entry.path().to_str().expect(&format!(
                     "{}: failure while walking directory (could not turn \
                      an entry's path into str - invalid unicode?)", path_str));
-                if let Err(errors) = config.read(p) {
-                    for e in errors {
-                        control.warning(&format!("{}: {}", p, e))
+                if let Some(extension) = entry.path().extension() {
+                    if extension == "conf" {
+                        if let Err(errors) = config.read(p) {
+                            for e in errors {
+                                control.warning(&format!("{}: {}", p, e))
+                            }
+                        }
                     }
                 }
             }
