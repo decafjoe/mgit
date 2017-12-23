@@ -1,10 +1,12 @@
 extern crate ansi_term;
 #[macro_use] extern crate clap;
 extern crate ini;
+extern crate pager;
 extern crate users;
 extern crate walkdir;
 
 use clap::{App, Arg};
+use pager::Pager;
 use walkdir::WalkDir;
 
 use config::Config;
@@ -20,6 +22,8 @@ const QUIET_ARG: &str = "QUIET";
 const WARNING_ARG: &str = "WARNING";
 
 pub fn main() {
+    Pager::with_pager("less -efFnrX").setup();
+
     let matches = App::new("mgit")
         .version(crate_version!())
         .author(crate_authors!())
