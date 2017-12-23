@@ -1,11 +1,14 @@
 //! Configuration parser and API.
+use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use ini::Ini;
+
+use path;
 
 
 // ----- Error ----------------------------------------------------------------
@@ -15,6 +18,7 @@ use ini::Ini;
 /// Note that underlying errors (e.g. permissions errors) are
 /// "exposed" by adding their message to the `message` string. This is
 /// the responsibility of whoever is constructing the error.
+#[derive(Debug)]
 pub struct Error {
     /// Message describing the error.
     message: String,
@@ -78,6 +82,35 @@ impl Repo {
             symbol: symbol,
             tags: Vec::new(),
         }
+    }
+
+    /// Returns the expanded, absolute path to the repository.
+    pub fn absolute_path(&self) -> Result<PathBuf, Error> {
+        let path = match path::expand(&self.path) {
+            Ok(path) => {
+                if path.is_relative() {
+                    let mut p = PathBuf::from(&self.config_path);
+                    p.pop();
+                    p.push(path);
+                    p
+                } else {
+                    path
+                }
+            },
+            Err(e) => return Err(Error::new(&format!(
+                "failed to expand path '{}' failed ({})", self.path, e))),
+        };
+        match path.canonicalize() {
+            Ok(path) => Ok(path),
+            Err(e) => Err(Error::new(&format!(
+                "failed to canonicalize path '{}' ({})",
+                path.to_str().unwrap(), e))),
+        }
+    }
+
+    /// Returns config path for this repository.
+    pub fn config_path(&self) -> &str {
+        &self.config_path
     }
 
     /// Returns path to the repository as specified by the end user.
@@ -206,19 +239,41 @@ impl Config {
             Err(e) => return err_e(&e, "could not parse file"),
         };
 
+        let mut absolute_paths = HashMap::new();
+        for repo in self.repos() {
+            // We checked the result of this below (when the repo was
+            // added), so it's fine to unwrap() it.
+            absolute_paths.insert(
+                repo.absolute_path().unwrap(), repo.config_path().to_owned());
+        }
+
         let mut errors = Vec::new();
         for (repo_path, _) in &ini {
             if let Some(repo_path) = repo_path.as_ref() {
-                // TODO(jjoyce): iterate through repos and look for
-                //               another one with the same path?
-                //               could use self.repos() here?
-                self.repos.push(Repo::new(
+                let repo = Repo::new(
                     path,
                     repo_path,
                     ini.get_from(Some(repo_path.to_string()), NAME_KEY),
                     ini.get_from(Some(repo_path.to_string()), COMMENT_KEY),
-                    ini.get_from(Some(repo_path.to_string()), SYMBOL_KEY)));
+                    ini.get_from(Some(repo_path.to_string()), SYMBOL_KEY));
+                let absolute_path = match repo.absolute_path() {
+                    Ok(path) => path,
+                    Err(e) => {
+                        errors.push(Error::new(&format!(
+                            "failed to get absolute path for '{}' ({})",
+                            repo_path, e)));
+                        continue
+                    },
+                };
+                if let Some(config_path) = absolute_paths.get(&absolute_path) {
+                    errors.push(Error::new(&format!(
+                        "repo at '{}' already configured in config file '{}' \
+                         (ignoring this definition)",
+                        absolute_path.to_str().unwrap(), config_path)));
+                    continue
+                }
                 // TODO(jjoyce): parse and populate tags
+                self.repos.push(repo);
             }
         }
 
