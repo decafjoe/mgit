@@ -6,7 +6,7 @@ extern crate users;
 use clap::{App, Arg};
 
 use config::Config;
-use invocation::{Invocation, WarningAction};
+use invocation::{Control, Invocation, WarningAction};
 
 mod cmd;
 mod config;
@@ -41,21 +41,20 @@ pub fn main() {
         .subcommand(cmd::config::subcommand())
         .get_matches();
 
-    let warning = if matches.is_present(WARNING_ARG) {
+    let warning_action = if matches.is_present(WARNING_ARG) {
         WarningAction::Exit
     } else if matches.is_present(QUIET_ARG) {
         WarningAction::Ignore
     } else {
         WarningAction::Print
     };
+    let control = Control::new(warning_action);
 
     let config = Config::new();
-    let invocation = Invocation::new(&config, &matches, warning);
 
-    if let Some(_) = matches.subcommand_matches(cmd::config::NAME) {
-        cmd::config::run(&invocation);
+    if let Some(m) = matches.subcommand_matches(cmd::config::NAME) {
+        cmd::config::run(&Invocation::new(&config, &m, &control));
     } else {
-        let msg = "no command supplied, see `mgit --help` for usage info";
-        invocation.control().error(msg);
+        control.error("no command supplied, see `mgit -h` for usage info")
     }
 }

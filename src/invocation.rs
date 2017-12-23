@@ -47,21 +47,29 @@ impl Control {
 
 pub struct Invocation<'a> {
     config: &'a Config,
-    control: Control,
+    control: &'a Control,
     matches: &'a ArgMatches<'a>,
 }
 
 impl<'a> Invocation<'a> {
     pub fn new(config: &'a Config, matches: &'a ArgMatches,
-               warning: WarningAction) -> Self {
+               control: &'a Control) -> Self {
         Self {
             config: config,
-            control: Control::new(warning),
+            control: control,
             matches: matches,
         }
     }
 
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
     pub fn control(&self) -> &Control {
         &self.control
+    }
+
+    pub fn matches(&self) -> &ArgMatches {
+        &self.matches
     }
 }
