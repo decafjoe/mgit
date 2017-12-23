@@ -1,4 +1,5 @@
 use std::error::Error as StdError;
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -17,6 +18,13 @@ impl Error {
         Self{ message: message.to_owned() }
     }
 }
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
 
 
 // ----- Repo -----------------------------------------------------------------
