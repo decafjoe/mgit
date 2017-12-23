@@ -2,8 +2,10 @@ extern crate ansi_term;
 #[macro_use] extern crate clap;
 extern crate ini;
 extern crate users;
+extern crate walkdir;
 
 use clap::{App, Arg};
+use walkdir::WalkDir;
 
 use config::Config;
 use invocation::{Control, Invocation, WarningAction};
@@ -50,7 +52,61 @@ pub fn main() {
     };
     let control = Control::new(warning_action);
 
-    let config = Config::new();
+    let mut config = Config::new();
+    for path_str in matches.values_of(CONFIG_ARG).unwrap() {
+        let path = match path::expand(path_str) {
+            Ok(path_buf) => path_buf,
+            Err(e) => {
+                control.warning(&format!(
+                    "{}: could not resolve path ({})", path_str, e));
+                continue
+            },
+        };
+        if !path.exists() {
+            control.warning(&format!(
+                "{}: does not exist or could not be read", path_str));
+            continue
+        }
+        if path.is_file() {
+            if let Err(errors) = config.read(path_str) {
+                for e in errors {
+                    control.warning(&format!("{}: {}", path_str, e));
+                }
+            }
+            continue
+        }
+        if !path.is_dir() {
+            control.warning(&format!(
+                "{}: not a file or directory, or could not be read",
+                path_str));
+            continue
+        }
+        for entry in WalkDir::new(&path) {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(e) => {
+                    control.warning(&format!(
+                        "{}: failure when walking directory ({})",
+                        path_str, e));
+                    continue
+                }
+            };
+            if entry.path().is_file() {
+                let p = entry.path().to_str().expect(&format!(
+                    "{}: failure while walking directory (could not turn \
+                     an entry's path into str - invalid unicode?)", path_str));
+                if let Err(errors) = config.read(p) {
+                    for e in errors {
+                        control.warning(&format!("{}: {}", p, e))
+                    }
+                }
+            }
+        }
+    }
+
+    if config.repos().len() < 1 {
+        control.error("no repositories configured")
+    }
 
     if let Some(m) = matches.subcommand_matches(cmd::config::NAME) {
         cmd::config::run(&Invocation::new(&config, &m, &control));
