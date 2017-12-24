@@ -41,6 +41,8 @@ impl fmt::Display for Error {
 
 // ----- Repo -----------------------------------------------------------------
 
+const DEFAULT_SYMBOL: &str = "•";
+
 /// Configuration for an individual repository.
 pub struct Repo {
     /// Path to the configuration file in which repo was defined.
@@ -116,6 +118,43 @@ impl Repo {
     /// Returns path to the repository as specified by the end user.
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    /// Returns name of the repository.
+    pub fn name(&self) -> Option<String> {
+        self.name.to_owned()
+    }
+
+    /// Returns name of repository if set, or the default value (last
+    /// component of the repo path) if name is not set.
+    pub fn name_or_default(&self) -> String {
+        let msg = format!("could not get file_name from '{}'", self.path);
+        match self.name() {
+            Some(name) => name,
+            None => PathBuf::from(&self.path)
+                .file_name().expect(&msg)
+                .to_str().expect("file_name was not valid unicode")
+                .to_owned()
+        }
+    }
+
+    /// Returns comment for the repository.
+    pub fn comment(&self) -> Option<String> {
+        self.comment.to_owned()
+    }
+
+    /// Returns symbol for the repository.
+    pub fn symbol(&self) -> Option<String> {
+        self.symbol.to_owned()
+    }
+
+    /// Returns symbol of repository if set, or the default value if
+    /// symbol is not set.
+    pub fn symbol_or_default(&self) -> String {
+        match self.symbol() {
+            Some(symbol) => symbol,
+            None => DEFAULT_SYMBOL.to_owned(),
+        }
     }
 
     /// Returns tags for this repository.
