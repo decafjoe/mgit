@@ -62,8 +62,12 @@ pub struct Repo {
 
 impl Repo {
     /// Creates and returns a new Repo object.
-    pub fn new(config_path: &str, repo_path: &str, name: Option<&str>,
-               comment: Option<&str>, symbol: Option<&str>) -> Self {
+    pub fn new(config_path: &str,
+               repo_path: &str,
+               name: Option<&str>,
+               comment: Option<&str>,
+               symbol: Option<&str>,
+               tags: Option<&str>) -> Self {
         let name = match name {
             Some(s) => Some(s.to_owned()),
             None => None,
@@ -76,13 +80,23 @@ impl Repo {
             Some(s) => Some(s.to_owned()),
             None => None,
         };
+        let tags = match tags {
+            Some(s) => {
+                let mut tags = Vec::new();
+                for tag in s.split_whitespace() {
+                    tags.push(tag.to_owned())
+                }
+                tags
+            },
+            None => Vec::new(),
+        };
         Self {
             config_path: config_path.to_owned(),
             path: repo_path.to_owned(),
             name: name,
             comment: comment,
             symbol: symbol,
-            tags: Vec::new(),
+            tags: tags,
         }
     }
 
@@ -294,7 +308,8 @@ impl Config {
                     repo_path,
                     ini.get_from(Some(repo_path.to_string()), NAME_KEY),
                     ini.get_from(Some(repo_path.to_string()), COMMENT_KEY),
-                    ini.get_from(Some(repo_path.to_string()), SYMBOL_KEY));
+                    ini.get_from(Some(repo_path.to_string()), SYMBOL_KEY),
+                    ini.get_from(Some(repo_path.to_string()), TAGS_KEY));
                 let absolute_path = match repo.absolute_path() {
                     Ok(path) => path,
                     Err(e) => {
@@ -311,7 +326,6 @@ impl Config {
                         absolute_path.to_str().unwrap(), config_path)));
                     continue
                 }
-                // TODO(jjoyce): parse and populate tags
                 self.repos.push(repo);
             }
         }
