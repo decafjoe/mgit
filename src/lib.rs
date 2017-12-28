@@ -51,6 +51,8 @@ pub fn main() {
              .short("w")
              .long("warning-is-error"))
         .subcommand(cmd::config::subcommand())
+        .subcommand(cmd::pull::subcommand())
+        .subcommand(cmd::status::subcommand())
         .get_matches();
 
     let warning_action = if matches.is_present(WARNING_ARG) {
@@ -131,6 +133,10 @@ pub fn main() {
 
     if let Some(m) = matches.subcommand_matches(cmd::config::NAME) {
         cmd::config::run(&Invocation::new(&config, &m, &control));
+    } else if let Some(m) = matches.subcommand_matches(cmd::pull::NAME) {
+        cmd::pull::run(&Invocation::new(&config, &m, &control));
+    } else if let Some(m) = matches.subcommand_matches(cmd::status::NAME) {
+        cmd::status::run(&Invocation::new(&config, &m, &control));
     } else {
         control.error("no command supplied, see `mgit -h` for usage info")
     }
