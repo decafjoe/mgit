@@ -16,7 +16,7 @@ pub fn subcommand<'a>() -> App<'a, 'a> {
     SubCommand::with_name(NAME)
         .about("Prints configuration values")
         .arg(Arg::with_name(TAG_ARG)
-             .help("Limits display to specified tag(s)")
+             .help("Limits display to repos with specified tag(s)")
              .short("t")
              .long("tag")
              .multiple(true)
