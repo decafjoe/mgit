@@ -69,11 +69,17 @@ version = "0.2.0"
 dependencies = [
  "ansi_term 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.28.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ordermap 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "pager 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-ini 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "users 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "walkdir 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "ordermap"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "pager"
@@ -193,6 +199,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum libc 0.2.34 (registry+https://github.com/rust-lang/crates.io-index)" = "36fbc8a8929c632868295d0178dd8f63fc423fd7537ad0738372bd010b3ac9b0"
 "checksum log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "880f77541efa6e5cc74e76910c9884d9859683118839d6a1dc3b11e63512565b"
+"checksum ordermap 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "40cd62c688b4d8078c3f0eef70d7762f17c08bf52b225799ddcb4cf275dd1f19"
 "checksum pager 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)" = "175e6ec8b6c51fcbb3a6db4ef68cd94e577d5b5ed7ecadbf24dfd76114ade175"
 "checksum redox_syscall 0.1.32 (registry+https://github.com/rust-lang/crates.io-index)" = "ab105df655884ede59d45b7070c8a65002d921461ee813a024558ca16030eea0"
 "checksum redox_termios 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7e891cfe48e9100a70a3b6eb652fef28920c117d366339687bd5576160db0f76"

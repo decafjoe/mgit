@@ -1,6 +1,8 @@
 //! Prints the configuration.
 use ansi_term::Style;
+use ansi_term::Color::{Blue, Purple};
 use clap::{App, Arg, SubCommand};
+use ordermap::OrderMap;
 
 use config::ReposIterator;
 use invocation::Invocation;
@@ -40,48 +42,85 @@ pub fn run(invocation: &Invocation) {
 }
 
 pub fn print_repos(invocation: &Invocation, repos: ReposIterator) {
+    let verbose = invocation.matches().is_present(VERBOSE_ARG);
+
+    // Sort by path so the output order is deterministic and
+    // reasonably sane.
     let mut paths = Vec::new();
     for repo in repos {
-        paths.push(repo.path());
+        paths.push(repo.path())
     }
     paths.sort();
+
     for path in paths {
-        let verbose = invocation.matches().is_present(VERBOSE_ARG);
         let repo = invocation.config().repo(path)
             .expect(&format!("could not get repo for path {}", path));
-        println!("{}", repo.path());
-        println!("  path: {}",
-                 repo.absolute_path().unwrap().to_str().unwrap());
+
+        // Buffer information into a hashmap (which iterates in
+        // insertion order). We need to buffer since we want to draw ┖
+        // on the last line instead of ┠, and we don't know what the
+        // last line is until we look at all the settings (taking
+        // `verbose` into consideration).
+        let mut facts = OrderMap::new();
+
+        // The unwraps are ok because we do extensive checks when
+        // processing the configuration, including checking that the
+        // path can be resolved, exists, and can be turned into a
+        // string.
+        let path = repo.absolute_path().unwrap().to_str().unwrap().to_owned();
+        facts.insert("path", path);
+
         match repo.name() {
-            Some(name) => println!("  name: {}", name),
+            Some(name) => { facts.insert("name", name); },
             None => if verbose {
-                println!("  name: {} (default)", repo.name_or_default())
+                facts.insert("name",
+                             format!("{} (default)", repo.name_or_default()));
             },
         }
+
         match repo.comment() {
-            Some(comment) => println!("  comment: {}", comment),
+            Some(comment) => { facts.insert("comment", comment); },
             None => if verbose {
-                println!("  comment: <not set>")
+                facts.insert("comment", "<not set>".to_owned());
             },
         }
+
         match repo.symbol() {
-            Some(symbol) => println!("  symbol: {}", symbol),
+            Some(symbol) => { facts.insert("symbol", symbol); },
             None => if verbose {
-                println!("  symbol: {} (default)", repo.symbol_or_default())
+                let symbol = format!("{} (default)", repo.symbol_or_default());
+                facts.insert("symbol", symbol);
             },
         }
+
         let tags = repo.tags();
         if tags.len() > 0 {
-            print!("  tags: ");
+            let mut s = String::new();
             for (i, tag) in tags.iter().enumerate() {
                 if i != 0 {
-                    print!(", ");
+                    s.push_str(", ")
                 }
-                print!("{}", tag);
+                s.push_str(&tag)
             }
-            println!()
+            facts.insert("tags", s);
         } else if verbose {
-            println!("  tags: <none set>")
+            facts.insert("tags", "<none set>".to_owned());
+        }
+
+        println!("{}", Purple.bold().paint(repo.path()));
+        for (i, (key, value)) in facts.iter().enumerate() {
+            let mut line = String::from("─");
+            for _ in 0..7 - key.len() {
+                line.push_str("─");
+            }
+            line.push_str(" ");
+            let left = if i == (facts.len() - 1) {
+                "┖"
+            } else {
+                "┠"
+            };
+            println!("{}{}",
+                     Blue.paint(format!("  {}{}{}: ", left, line, key)), value)
         }
     }
 }
