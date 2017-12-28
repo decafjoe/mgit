@@ -1,7 +1,7 @@
 //! Filesystem path utilities.
 
 use std::fmt;
-use std::path::{MAIN_SEPARATOR, PathBuf};
+use std::path::{PathBuf, MAIN_SEPARATOR};
 
 use users::{get_current_uid, get_user_by_name, get_user_by_uid};
 use users::os::unix::UserExt;
@@ -16,8 +16,10 @@ pub struct Error {
 impl Error {
     /// Creates and returns a new error struct with the specified
     /// `message`.
-    pub fn new(message: &str) -> Error {
-        Error{ message: message.to_owned() }
+    pub fn new(message: &str) -> Self {
+        Self {
+            message: message.to_owned(),
+        }
     }
 }
 
@@ -27,13 +29,13 @@ impl fmt::Display for Error {
     }
 }
 
-/// Returns PathBuf for `path`, with leading tildes expanded out to
+/// Returns `PathBuf` for `path`, with leading tildes expanded out to
 /// the appropriate user home directory.
 ///
 /// # Panics
 ///
 /// The function will panic if for some reason splitting on the
-/// MAIN_SEPARATOR fails to produce any items. This should never be
+/// `MAIN_SEPARATOR` fails to produce any items. This should never be
 /// the case as a split always produces at least one item.
 ///
 /// # Errors
@@ -46,8 +48,10 @@ impl fmt::Display for Error {
 ///   named `example` cannot be fetched.
 pub fn expand(path: &str) -> Result<PathBuf, Error> {
     let sep = MAIN_SEPARATOR;
-    if path.starts_with("~") {
-        if path.len() == 1 || path.chars().nth(1).unwrap() == sep {
+    if path.starts_with('~') {
+        if path.len() == 1
+            || path.chars().nth(1).expect("could not get first char") == sep
+        {
             let uid = get_current_uid();
             if let Some(user) = get_user_by_uid(uid) {
                 let mut buf = user.home_dir().to_path_buf();
@@ -57,11 +61,15 @@ pub fn expand(path: &str) -> Result<PathBuf, Error> {
                 Ok(buf)
             } else {
                 return Err(Error::new(&format!(
-                    "failed to look up user info for uid {}", uid)))
+                    "failed to look up user info for uid {}",
+                    uid
+                )))
             }
         } else {
             let name = path[1..].split(sep).nth(0).expect(&format!(
-                "splitting '{}' on MAIN_SEPARATOR ('{}') failed", path, sep));
+                "splitting '{}' on MAIN_SEPARATOR ('{}') failed",
+                path, sep
+            ));
             if let Some(user) = get_user_by_name(name) {
                 let mut buf = user.home_dir().to_path_buf();
                 if path.len() > name.len() + 1 {
@@ -70,7 +78,9 @@ pub fn expand(path: &str) -> Result<PathBuf, Error> {
                 Ok(buf)
             } else {
                 return Err(Error::new(&format!(
-                    "failed to look up user info for username {}", name)))
+                    "failed to look up user info for username {}",
+                    name
+                )))
             }
         }
     } else {

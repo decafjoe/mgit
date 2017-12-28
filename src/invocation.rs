@@ -6,7 +6,6 @@ use clap::ArgMatches;
 use ansi_term::Color::{Red, Yellow};
 use config::Config;
 
-
 // ----- WarningAction --------------------------------------------------------
 
 /// Indicates the action to take upon encountering a warning.
@@ -20,7 +19,6 @@ pub enum WarningAction {
     Exit,
 }
 
-
 // ----- Control --------------------------------------------------------------
 
 /// Warnings, errors, and program control API.
@@ -33,7 +31,7 @@ impl Control {
     /// Creates and returns a new control instance, which will do
     /// `warning` action on warnings.
     pub fn new(warning: WarningAction) -> Self {
-        Self{ warning: warning }
+        Self { warning: warning }
     }
 
     /// Registers a warning.
@@ -56,7 +54,6 @@ impl Control {
     }
 }
 
-
 // ----- Invocation -----------------------------------------------------------
 
 /// All the state for a given invocation of the program.
@@ -71,8 +68,11 @@ pub struct Invocation<'a> {
 
 impl<'a> Invocation<'a> {
     /// Creates and returns a new invocation instance.
-    pub fn new(config: &'a Config, matches: &'a ArgMatches,
-               control: &'a Control) -> Self {
+    pub fn new(
+        config: &'a Config,
+        matches: &'a ArgMatches,
+        control: &'a Control,
+    ) -> Self {
         Self {
             config: config,
             control: control,
@@ -82,16 +82,16 @@ impl<'a> Invocation<'a> {
 
     /// Returns the config struct for this invocation.
     pub fn config(&self) -> &Config {
-        &self.config
+        self.config
     }
 
     /// Returns the control struct for this invocation.
     pub fn control(&self) -> &Control {
-        &self.control
+        self.control
     }
 
     /// Returns the matches struct for this invocation.
     pub fn matches(&self) -> &ArgMatches {
-        &self.matches
+        self.matches
     }
 }

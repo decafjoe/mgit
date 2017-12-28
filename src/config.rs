@@ -10,7 +10,6 @@ use ini::Ini;
 
 use path;
 
-
 // ----- Error ----------------------------------------------------------------
 
 /// Error type for this module.
@@ -27,7 +26,9 @@ pub struct Error {
 impl Error {
     /// Returns a new error instance with the specified `message`.
     pub fn new(message: &str) -> Self {
-        Self{ message: message.to_owned() }
+        Self {
+            message: message.to_owned(),
+        }
     }
 }
 
@@ -37,11 +38,10 @@ impl fmt::Display for Error {
     }
 }
 
-
-
 // ----- Repo -----------------------------------------------------------------
 
-const DEFAULT_SYMBOL: &str = "•";
+/// Symbol to use if symbol is not configured by end user.
+const DEFAULT_SYMBOL: &str = "\u{2022}";
 
 /// Configuration for an individual repository.
 pub struct Repo {
@@ -62,12 +62,14 @@ pub struct Repo {
 
 impl Repo {
     /// Creates and returns a new Repo object.
-    pub fn new(config_path: &str,
-               repo_path: &str,
-               name: Option<&str>,
-               comment: Option<&str>,
-               symbol: Option<&str>,
-               tags: Option<&str>) -> Self {
+    pub fn new(
+        config_path: &str,
+        repo_path: &str,
+        name: Option<&str>,
+        comment: Option<&str>,
+        symbol: Option<&str>,
+        tags: Option<&str>,
+    ) -> Self {
         let name = match name {
             Some(s) => Some(s.to_owned()),
             None => None,
@@ -87,7 +89,7 @@ impl Repo {
                     tags.push(tag.to_owned())
                 }
                 tags
-            },
+            }
             None => Vec::new(),
         };
         Self {
@@ -112,15 +114,21 @@ impl Repo {
                 } else {
                     path
                 }
-            },
-            Err(e) => return Err(Error::new(&format!(
-                "failed to expand path '{}' failed ({})", self.path, e))),
+            }
+            Err(e) => {
+                return Err(Error::new(&format!(
+                    "failed to expand path '{}' failed ({})",
+                    self.path, e
+                )))
+            }
         };
         match path.canonicalize() {
             Ok(path) => Ok(path),
             Err(e) => Err(Error::new(&format!(
                 "failed to canonicalize path '{}' ({})",
-                path.to_str().unwrap(), e))),
+                path.to_str().expect("failed to cast path to string"),
+                e
+            ))),
         }
     }
 
@@ -146,9 +154,11 @@ impl Repo {
         match self.name() {
             Some(name) => name,
             None => PathBuf::from(&self.path)
-                .file_name().expect(&msg)
-                .to_str().expect("file_name was not valid unicode")
-                .to_owned()
+                .file_name()
+                .expect(&msg)
+                .to_str()
+                .expect("file_name was not valid unicode")
+                .to_owned(),
         }
     }
 
@@ -177,7 +187,6 @@ impl Repo {
     }
 }
 
-
 // ----- ReposIterator --------------------------------------------------------
 
 /// Iterator over a sequence of repos.
@@ -193,7 +202,10 @@ impl<'a> ReposIterator<'a> {
     /// Creates and returns a new iterator for `config`, which will
     /// iterate over the repos at `indices`.
     pub fn new(config: &'a Config, indices: &[usize]) -> Self {
-        Self{ config: config, indices: indices.to_vec() }
+        Self {
+            config: config,
+            indices: indices.to_vec(),
+        }
     }
 }
 
@@ -201,10 +213,10 @@ impl<'a> Iterator for ReposIterator<'a> {
     type Item = &'a Repo;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.indices.len() > 0 {
-            Some(&self.config.repos()[self.indices.remove(0)])
-        } else {
+        if self.indices.is_empty() {
             None
+        } else {
+            Some(&self.config.repos()[self.indices.remove(0)])
         }
     }
 }
@@ -235,13 +247,15 @@ const TAGS_KEY: &str = "tags";
 /// "Lists" of repos can be fetched using `repos_iter` or
 /// `repos_tagged`.
 pub struct Config {
+    /// Vec of repo references that have been successfully
+    /// initialized.
     repos: Vec<Repo>,
 }
 
 impl Config {
     /// Creates and returns a new configuration object.
     pub fn new() -> Self {
-        Config{ repos: Vec::new() }
+        Self { repos: Vec::new() }
     }
 
     /// Reads the file at `path`, returning a vec of errors if there
@@ -264,10 +278,15 @@ impl Config {
     /// * Configuration contains repositories that have already been
     /// defined.
     pub fn read(&mut self, path: &str) -> Result<(), Vec<Error>> {
+        /// Returns a single-item vec containing an `Error` with the
+        /// specified `msg`.
         fn err(msg: &str) -> Result<(), Vec<Error>> {
             Err(vec![Error::new(msg)])
         }
 
+        /// Returns a single-item vec containing an `Error`. The
+        /// message is a combination of `msg` and the value of the
+        /// error `e`.
         fn err_e(e: &StdError, msg: &str) -> Result<(), Vec<Error>> {
             err(&format!("{} ({})", msg, e))
         }
@@ -294,10 +313,10 @@ impl Config {
 
         let mut absolute_paths = HashMap::new();
         for repo in self.repos() {
-            // We checked the result of this below (when the repo was
-            // added), so it's fine to unwrap() it.
             absolute_paths.insert(
-                repo.absolute_path().unwrap(), repo.config_path().to_owned());
+                repo.absolute_path().expect("could not get repo path"),
+                repo.config_path().to_owned(),
+            );
         }
 
         let mut errors = Vec::new();
@@ -309,31 +328,37 @@ impl Config {
                     ini.get_from(Some(repo_path.to_string()), NAME_KEY),
                     ini.get_from(Some(repo_path.to_string()), COMMENT_KEY),
                     ini.get_from(Some(repo_path.to_string()), SYMBOL_KEY),
-                    ini.get_from(Some(repo_path.to_string()), TAGS_KEY));
+                    ini.get_from(Some(repo_path.to_string()), TAGS_KEY),
+                );
                 let absolute_path = match repo.absolute_path() {
                     Ok(path) => path,
                     Err(e) => {
                         errors.push(Error::new(&format!(
                             "failed to get absolute path for '{}' ({})",
-                            repo_path, e)));
+                            repo_path, e
+                        )));
                         continue
-                    },
+                    }
                 };
                 if let Some(config_path) = absolute_paths.get(&absolute_path) {
                     errors.push(Error::new(&format!(
                         "repo at '{}' already configured in config file '{}' \
                          (ignoring this definition)",
-                        absolute_path.to_str().unwrap(), config_path)));
+                        absolute_path
+                            .to_str()
+                            .expect("could not cast path to string"),
+                        config_path
+                    )));
                     continue
                 }
                 self.repos.push(repo);
             }
         }
 
-        if errors.len() > 0 {
-            Err(errors)
-        } else {
+        if errors.is_empty() {
             Ok(())
+        } else {
+            Err(errors)
         }
     }
 

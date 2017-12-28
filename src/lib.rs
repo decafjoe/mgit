@@ -1,6 +1,7 @@
 //! Library that drives mgit.
 extern crate ansi_term;
-#[macro_use] extern crate clap;
+#[macro_use]
+extern crate clap;
 extern crate ini;
 extern crate ordermap;
 extern crate pager;
@@ -34,22 +35,28 @@ pub fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Small program for managing multiple git repositories.")
-        .arg(Arg::with_name(CONFIG_ARG)
-             .default_value("~/.mgit")
-             .help("Path to configuration file or directory")
-             .short("c")
-             .long("config")
-             .multiple(true)
-             .number_of_values(1)
-             .value_name("PATH"))
-        .arg(Arg::with_name(QUIET_ARG)
-             .help("Suppresses warning messages")
-             .short("q")
-             .long("quiet"))
-        .arg(Arg::with_name(WARNING_ARG)
-             .help("Treats warnings as errors (overrides suppression)")
-             .short("w")
-             .long("warning-is-error"))
+        .arg(
+            Arg::with_name(CONFIG_ARG)
+                .default_value("~/.mgit")
+                .help("Path to configuration file or directory")
+                .short("c")
+                .long("config")
+                .multiple(true)
+                .number_of_values(1)
+                .value_name("PATH"),
+        )
+        .arg(
+            Arg::with_name(QUIET_ARG)
+                .help("Suppresses warning messages")
+                .short("q")
+                .long("quiet"),
+        )
+        .arg(
+            Arg::with_name(WARNING_ARG)
+                .help("Treats warnings as errors (overrides suppression)")
+                .short("w")
+                .long("warning-is-error"),
+        )
         .subcommand(cmd::config::subcommand())
         .subcommand(cmd::pull::subcommand())
         .subcommand(cmd::status::subcommand())
@@ -65,25 +72,31 @@ pub fn main() {
     let control = Control::new(warning_action);
 
     let mut config = Config::new();
-    for path_str in matches.values_of(CONFIG_ARG).unwrap() {
+    for path_str in matches.values_of(CONFIG_ARG).expect("no config args") {
         let path = match path::expand(path_str) {
             Ok(path_buf) => match path_buf.canonicalize() {
                 Ok(path_buf) => path_buf,
                 Err(e) => {
                     control.warning(&format!(
-                        "{}: could not canonicalize path ({})", path_str, e));
+                        "{}: could not canonicalize path ({})",
+                        path_str, e
+                    ));
                     continue
-                },
+                }
             },
             Err(e) => {
                 control.warning(&format!(
-                    "{}: could not resolve path ({})", path_str, e));
+                    "{}: could not resolve path ({})",
+                    path_str, e
+                ));
                 continue
-            },
+            }
         };
         if !path.exists() {
             control.warning(&format!(
-                "{}: does not exist or could not be read", path_str));
+                "{}: does not exist or could not be read",
+                path_str
+            ));
             continue
         }
         if path.is_file() {
@@ -97,7 +110,8 @@ pub fn main() {
         if !path.is_dir() {
             control.warning(&format!(
                 "{}: not a file or directory, or could not be read",
-                path_str));
+                path_str
+            ));
             continue
         }
         for entry in WalkDir::new(&path) {
@@ -106,14 +120,17 @@ pub fn main() {
                 Err(e) => {
                     control.warning(&format!(
                         "{}: failure when walking directory ({})",
-                        path_str, e));
+                        path_str, e
+                    ));
                     continue
                 }
             };
             if entry.path().is_file() {
                 let p = entry.path().to_str().expect(&format!(
                     "{}: failure while walking directory (could not turn \
-                     an entry's path into str - invalid unicode?)", path_str));
+                     an entry's path into str - invalid unicode?)",
+                    path_str
+                ));
                 if let Some(extension) = entry.path().extension() {
                     if extension == "conf" {
                         if let Err(errors) = config.read(p) {
@@ -132,11 +149,11 @@ pub fn main() {
     }
 
     if let Some(m) = matches.subcommand_matches(cmd::config::NAME) {
-        cmd::config::run(&Invocation::new(&config, &m, &control));
+        cmd::config::run(&Invocation::new(&config, m, &control));
     } else if let Some(m) = matches.subcommand_matches(cmd::pull::NAME) {
-        cmd::pull::run(&Invocation::new(&config, &m, &control));
+        cmd::pull::run(&Invocation::new(&config, m, &control));
     } else if let Some(m) = matches.subcommand_matches(cmd::status::NAME) {
-        cmd::status::run(&Invocation::new(&config, &m, &control));
+        cmd::status::run(&Invocation::new(&config, m, &control));
     } else {
         control.error("no command supplied, see `mgit -h` for usage info")
     }

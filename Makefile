@@ -14,6 +14,12 @@ release :
 test :
 	cargo test
 
+lint :
+	cargo +nightly clippy -- -Wclippy-pedantic
+
+fmt :
+	cargo +nightly fmt -- --write-mode diff
+
 doc :
 	cargo rustdoc -- \
 		--no-defaults \
