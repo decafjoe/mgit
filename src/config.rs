@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use git2::Repository;
 use ini::Ini;
 
 use path;
@@ -58,6 +59,8 @@ pub struct Repo {
     symbol: Option<String>,
     /// Tags associated with the repo.
     tags: Vec<String>,
+    /// libgit2 `Repository` instance for this repo.
+    git: Option<Repository>,
 }
 
 impl Repo {
@@ -99,6 +102,7 @@ impl Repo {
             comment: comment,
             symbol: symbol,
             tags: tags,
+            git: None,
         }
     }
 
@@ -184,6 +188,19 @@ impl Repo {
     /// Returns tags for this repository.
     pub fn tags(&self) -> &[String] {
         self.tags.as_slice()
+    }
+
+    /// Sets the repository instance for the repo config.
+    fn set_git(&mut self, git: Repository) {
+        self.git = Some(git)
+    }
+
+    /// Returns `Repository` instance for this repository.
+    pub fn git(&self) -> &Repository {
+        match self.git {
+            Some(ref repository) => repository,
+            None => panic!("repository is not set"),
+        }
     }
 }
 
@@ -276,7 +293,9 @@ impl Config {
     /// * File at `path` cannot be read into a string.
     /// * File at `path` cannot be parsed.
     /// * Configuration contains repositories that have already been
-    /// defined.
+    ///   defined.
+    /// * Configuration contains repositories that cannot be opened by
+    ///   the libgit2 library.
     pub fn read(&mut self, path: &str) -> Result<(), Vec<Error>> {
         /// Returns a single-item vec containing an `Error` with the
         /// specified `msg`.
@@ -322,7 +341,7 @@ impl Config {
         let mut errors = Vec::new();
         for (repo_path, _) in &ini {
             if let Some(repo_path) = repo_path.as_ref() {
-                let repo = Repo::new(
+                let mut repo = Repo::new(
                     path,
                     repo_path,
                     ini.get_from(Some(repo_path.to_string()), NAME_KEY),
@@ -340,18 +359,29 @@ impl Config {
                         continue
                     }
                 };
+                let absolute_path_str = absolute_path
+                    .to_str()
+                    .expect("could not cast absolute path to string");
                 if let Some(config_path) = absolute_paths.get(&absolute_path) {
                     errors.push(Error::new(&format!(
                         "repo at '{}' already configured in config file '{}' \
                          (ignoring this definition)",
-                        absolute_path
-                            .to_str()
-                            .expect("could not cast path to string"),
-                        config_path
+                        absolute_path_str, config_path
                     )));
                     continue
                 }
-                self.repos.push(repo);
+                match Repository::open(&absolute_path) {
+                    Ok(repository) => {
+                        repo.set_git(repository);
+                        self.repos.push(repo)
+                    }
+                    Err(e) => {
+                        errors.push(Error::new(&format!(
+                            "failed to open repository at '{}' ({})",
+                            absolute_path_str, e
+                        )));
+                    }
+                }
             }
         }
 
