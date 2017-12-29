@@ -42,18 +42,21 @@ pub fn run(invocation: &Invocation) {
         let style = Style::new().bold().underline();
         for tag in tags {
             println!("\n{}{}", style.paint("TAG:"), style.paint(tag));
-            print_repos(invocation, invocation.config().repos_tagged(tag));
+            print_repos_config(
+                invocation,
+                invocation.config().repos_tagged(tag),
+            )
         }
     } else {
         println!();
-        print_repos(invocation, invocation.config().repos_iter());
+        print_repos_config(invocation, invocation.config().repos_iter())
     }
-    println!();
+    println!()
 }
 
 /// Prints the repos in `repos`.
 #[cfg_attr(feature = "cargo-clippy", allow(print_stdout))]
-pub fn print_repos(invocation: &Invocation, repos: ReposIterator) {
+pub fn print_repos_config(invocation: &Invocation, repos: ReposIterator) {
     let verbose = invocation.matches().is_present(VERBOSE_ARG);
 
     // Sort by path so the output order is deterministic and
