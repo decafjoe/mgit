@@ -54,9 +54,9 @@ pub fn run(invocation: &Invocation) {
     println!()
 }
 
-/// Prints the repos in `repos`.
+/// Prints configuration for repos in `repos`.
 #[cfg_attr(feature = "cargo-clippy", allow(print_stdout))]
-pub fn print_repos_config(invocation: &Invocation, repos: ReposIterator) {
+fn print_repos_config(invocation: &Invocation, repos: ReposIterator) {
     let verbose = invocation.matches().is_present(VERBOSE_ARG);
 
     // Sort by path so the output order is deterministic and
