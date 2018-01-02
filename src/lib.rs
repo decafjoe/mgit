@@ -20,6 +20,7 @@ mod cmd;
 mod config;
 mod invocation;
 mod path;
+mod ui;
 
 /// Argument name for -c/--config.
 const CONFIG_ARG: &str = "CONFIG";
