@@ -188,15 +188,15 @@ fn print_repo_status(
     repo: &Repo,
     cache: &mut HashMap<String, Summary>,
 ) {
-    let name = repo.name_or_default();
-    let insert = cache.get(&name).is_none();
+    let path = repo.path();
+    let insert = cache.get(path).is_none();
     if insert {
-        cache.insert(name.to_owned(), get_summary(repo));
+        cache.insert(path.to_owned(), get_summary(repo));
     }
-    let summary = cache.get(&name).expect("failed to get summary");
+    let summary = cache.get(path).expect("failed to get summary");
 
     let verbose = invocation.matches().is_present(VERBOSE_ARG);
-    let path = if verbose {
+    let absolute_path = if verbose {
         format!(
             " \n  \u{2022} {}",
             repo.absolute_path()
@@ -216,8 +216,8 @@ fn print_repo_status(
     println!(
         "{} {}{}",
         color.bold().paint(repo.symbol_or_default()),
-        color.bold().paint(name),
-        path
+        color.bold().paint(repo.name_or_default()),
+        absolute_path
     );
 
     for note in summary.notes() {
@@ -303,7 +303,7 @@ pub fn run(invocation: &Invocation) {
     // hit the git2 API any more than we have to, since it's
     // (relatively) expensive.
     //
-    // The cache maps repo name (a `String`) to its `Summary`.
+    // The cache maps repo path (a `String`) to its `Summary`.
     let mut cache: HashMap<String, Summary> = HashMap::new();
 
     if let Some(tags) = invocation.matches().values_of(TAG_ARG) {
