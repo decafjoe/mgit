@@ -17,6 +17,8 @@
 /// Indicates the severity of a status note.
 #[derive(Clone, PartialEq, PartialOrd)]
 pub enum Severity {
+    /// Successful action (no response needed).
+    Success,
     /// Informational (no action needed).
     Info,
     /// Local branch is ahead of remote (requires action, but not
@@ -83,7 +85,7 @@ impl Summary {
 
     /// Returns the most severe `Severity` of this summary's notes.
     pub fn severity(&self) -> Severity {
-        let mut rv = Severity::Info;
+        let mut rv = Severity::Success;
         for note in &self.notes {
             let s = note.severity();
             if *s > rv {
