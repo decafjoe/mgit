@@ -204,40 +204,6 @@ impl Repo {
     }
 }
 
-// ----- ReposIterator --------------------------------------------------------
-
-/// Iterator over a sequence of repos.
-pub struct ReposIterator<'a> {
-    /// Reference to the config instance containing the repos being
-    /// iterated over.
-    config: &'a Config,
-    /// Indices of the repos being iterated over.
-    indices: Vec<usize>,
-}
-
-impl<'a> ReposIterator<'a> {
-    /// Creates and returns a new iterator for `config`, which will
-    /// iterate over the repos at `indices`.
-    pub fn new(config: &'a Config, indices: &[usize]) -> Self {
-        Self {
-            config: config,
-            indices: indices.to_vec(),
-        }
-    }
-}
-
-impl<'a> Iterator for ReposIterator<'a> {
-    type Item = &'a Repo;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.indices.is_empty() {
-            None
-        } else {
-            Some(&self.config.repos()[self.indices.remove(0)])
-        }
-    }
-}
-
 // ----- Config ---------------------------------------------------------------
 
 /// Name config key.
@@ -264,15 +230,17 @@ const TAGS_KEY: &str = "tags";
 /// "Lists" of repos can be fetched using `repos_iter` or
 /// `repos_tagged`.
 pub struct Config {
-    /// Vec of repo references that have been successfully
-    /// initialized.
-    repos: Vec<Repo>,
+    /// `HashMap` mapping repo `path` (a `String`) to the successfully
+    /// initialized `Repo` configuration.
+    repos: HashMap<String, Repo>,
 }
 
 impl Config {
     /// Creates and returns a new configuration object.
     pub fn new() -> Self {
-        Self { repos: Vec::new() }
+        Self {
+            repos: HashMap::new(),
+        }
     }
 
     /// Reads the file at `path`, returning a vec of errors if there
@@ -331,7 +299,7 @@ impl Config {
         };
 
         let mut absolute_paths = HashMap::new();
-        for repo in self.repos() {
+        for (_, repo) in self.repos() {
             absolute_paths.insert(
                 repo.absolute_path().expect("could not get repo path"),
                 repo.config_path().to_owned(),
@@ -373,7 +341,7 @@ impl Config {
                 match Repository::open(&absolute_path) {
                     Ok(repository) => {
                         repo.set_git(repository);
-                        self.repos.push(repo)
+                        self.repos.insert(repo_path.to_owned(), repo);
                     }
                     Err(e) => {
                         errors.push(Error::new(&format!(
@@ -392,40 +360,55 @@ impl Config {
         }
     }
 
-    /// Returns `Repo` configuration for repo at `path`.
+    /// Sorts a `Vec` of paths on name (primary) / path (secondary).
+    fn paths_sort(&self, rv: &mut Vec<&str>) {
+        rv.sort_by_key(|path| {
+            (
+                self.repo(*path)
+                    .expect(&format!("failed to get repo for path {}", path))
+                    .name_or_default(),
+                *path,
+            )
+        })
+    }
+
+    /// Returns `Vec` of all paths in the config, sorted by repository
+    /// name.
     ///
-    /// Note that no computation is done on the path (e.g. expanding
-    /// tildes) -- the `path` must match exactly what the end user
-    /// supplied in the configuration.
+    /// The secondary sort parameter is the path itself, to ensure
+    /// that return values from this function are deterministic.
+    pub fn paths<'a>(&'a self) -> Vec<&'a str> {
+        let mut rv = Vec::new();
+        for (path, _) in self.repos() {
+            rv.push(path.as_str())
+        }
+        self.paths_sort(&mut rv);
+        rv
+    }
+
+    /// Returns `Vec` of paths whose repos have the tag `tag`, sorted
+    /// by repository name.
+    ///
+    /// The secondary sort parameter is the path itself, to ensure
+    /// that return values from this function are deterministic.
+    pub fn paths_for_tag<'a>(&'a self, tag: &str) -> Vec<&'a str> {
+        let mut rv = Vec::new();
+        for (path, repo) in self.repos() {
+            if repo.tags().contains(&tag.to_owned()) {
+                rv.push(path.as_str())
+            }
+        }
+        self.paths_sort(&mut rv);
+        rv
+    }
+
+    /// Returns reference to repo at `path`.
     pub fn repo(&self, path: &str) -> Option<&Repo> {
-        for repo in self.repos() {
-            if path == repo.path() {
-                return Some(repo)
-            }
-        }
-        None
+        self.repos.get(path)
     }
 
-    /// Returns a slice containing configured repos.
-    pub fn repos(&self) -> &[Repo] {
-        self.repos.as_slice()
-    }
-
-    /// Returns an iterator over all configured repos.
-    pub fn repos_iter(&self) -> ReposIterator {
-        let indices = (0..self.repos.len()).collect::<Vec<_>>();
-        ReposIterator::new(self, indices.as_slice())
-    }
-
-    /// Returns an iterator over repos with the tag `tag`.
-    pub fn repos_tagged(&self, tag: &str) -> ReposIterator {
-        let tag = String::from(tag);
-        let mut indices = Vec::new();
-        for (i, repo) in self.repos.iter().enumerate() {
-            if repo.tags().contains(&tag) {
-                indices.push(i);
-            }
-        }
-        ReposIterator::new(self, indices.as_slice())
+    /// Returns reference to the repos `HashMap`.
+    pub fn repos(&self) -> &HashMap<String, Repo> {
+        &self.repos
     }
 }
