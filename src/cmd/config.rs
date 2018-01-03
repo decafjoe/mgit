@@ -75,6 +75,8 @@ fn print_repos_config(invocation: &Invocation, paths: &mut Vec<&str>) {
         // `verbose` into consideration).
         let mut facts = OrderMap::new();
 
+        facts.insert("config", repo.config_path().to_owned());
+
         // The unwraps are ok because we do extensive checks when
         // processing the configuration, including checking that the
         // path can be resolved, exists, and can be turned into a
