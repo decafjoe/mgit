@@ -29,10 +29,17 @@ const QUIET_ARG: &str = "QUIET";
 /// Argument name for -w/--warning.
 const WARNING_ARG: &str = "WARNING";
 
+/// "Start" the pager.
+///
+/// All subsequent output goes through an invocation of `less` that
+/// tries to be similar to some of the git porcelain commands (like
+/// `git diff`, for example).
+pub fn start_pager() {
+    Pager::with_pager("less -efFnrX").setup();
+}
+
 /// Entry point for the program.
 pub fn main() {
-    Pager::with_pager("less -efFnrX").setup();
-
     let matches = App::new("mgit")
         .version(crate_version!())
         .author(crate_authors!())

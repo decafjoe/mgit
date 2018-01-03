@@ -9,6 +9,7 @@ use git2::{BranchType, Error, Repository, Status, StatusOptions, StatusShow};
 
 use config::Repo;
 use invocation::Invocation;
+use start_pager;
 use ui::{Severity, Summary};
 
 // ----- Worktree -------------------------------------------------------------
@@ -275,6 +276,8 @@ pub fn run(invocation: &Invocation) {
     //
     // The cache maps repo path (a `String`) to its `Summary`.
     let mut cache: HashMap<String, Summary> = HashMap::new();
+
+    start_pager();
 
     if let Some(tags) = invocation.matches().values_of(TAG_ARG) {
         let style = Style::new().bold().underline();

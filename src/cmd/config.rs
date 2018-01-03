@@ -5,6 +5,7 @@ use clap::{App, Arg, SubCommand};
 use ordermap::OrderMap;
 
 use invocation::Invocation;
+use start_pager;
 
 /// Name of the command (`config`).
 pub const NAME: &str = "config";
@@ -37,6 +38,7 @@ pub fn subcommand<'a>() -> App<'a, 'a> {
 /// Prints the configuration per the arguments specified by the user.
 #[cfg_attr(feature = "cargo-clippy", allow(print_stdout))]
 pub fn run(invocation: &Invocation) {
+    start_pager();
     if let Some(tags) = invocation.matches().values_of(TAG_ARG) {
         let style = Style::new().bold().underline();
         for tag in tags {
