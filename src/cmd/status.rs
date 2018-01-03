@@ -210,7 +210,7 @@ fn print_repo_status(
     };
 
     let color = match summary.severity() {
-        Severity::Info => Green,
+        Severity::Info | Severity::Success => Green,
         Severity::Notice => Yellow,
         Severity::Warning => Red,
     };
@@ -223,9 +223,11 @@ fn print_repo_status(
 
     for note in summary.notes() {
         let style = match (verbose, note.severity()) {
-            (false, _) | (true, &Severity::Info) => Style::new(),
             (true, &Severity::Notice) => Yellow.normal(),
             (true, &Severity::Warning) => Red.normal(),
+            (false, _)
+            | (true, &Severity::Info)
+            | (true, &Severity::Success) => Style::new(),
         };
         if verbose || *note.severity() != Severity::Info {
             println!(
