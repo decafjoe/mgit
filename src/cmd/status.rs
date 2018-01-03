@@ -7,7 +7,7 @@ use clap::{App, Arg, SubCommand};
 use git2;
 use git2::{BranchType, Error, Repository, Status, StatusOptions, StatusShow};
 
-use config::{Repo, ReposIterator};
+use config::Repo;
 use invocation::Invocation;
 use ui::{Severity, Summary};
 
@@ -235,36 +235,6 @@ fn print_repo_status(
     }
 }
 
-/// Prints status information for a given `ReposIterator`.
-///
-/// The repos are printed in a stable, deterministic order, sorted on
-/// the repo's name.
-///
-/// `invocation` is simply passed through to `print_repo_status`.
-///
-/// `repos` is the `ReposIterator` containing the repos for which to
-/// print status.
-///
-/// `cache` is simply passed through to `print_repo_status`. See the
-/// docs on that function for more info.
-fn print_repos_status(
-    invocation: &Invocation,
-    repos: ReposIterator,
-    cache: &mut HashMap<String, Summary>,
-) {
-    // Sort by name so the output order is deterministic and
-    // reasonably sane.
-    let mut names = Vec::new();
-    for repo in repos {
-        names.push((repo.name_or_default(), repo))
-    }
-    names.sort_by(|a, b| a.0.cmp(&b.0));
-
-    for (_, repo) in names {
-        print_repo_status(invocation, repo, cache)
-    }
-}
-
 // ----- Command --------------------------------------------------------------
 
 /// Name of the command (`name`).
@@ -310,19 +280,29 @@ pub fn run(invocation: &Invocation) {
         let style = Style::new().bold().underline();
         for tag in tags {
             println!("\n{}{}", style.paint("TAG:"), style.paint(tag));
-            print_repos_status(
-                invocation,
-                invocation.config().repos_tagged(tag),
-                &mut cache,
-            )
+            for path in invocation.config().paths_for_tag(tag) {
+                print_repo_status(
+                    invocation,
+                    invocation.config().repo(path).expect(&format!(
+                        "failed to get repo for path '{}'",
+                        path
+                    )),
+                    &mut cache,
+                );
+            }
         }
     } else {
         println!();
-        print_repos_status(
-            invocation,
-            invocation.config().repos_iter(),
-            &mut cache,
-        )
+        for path in invocation.config().paths() {
+            print_repo_status(
+                invocation,
+                invocation.config().repo(path).expect(&format!(
+                    "failed to get repo for path '{}'",
+                    path
+                )),
+                &mut cache,
+            );
+        }
     }
     println!()
 }

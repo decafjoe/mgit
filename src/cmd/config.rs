@@ -4,7 +4,6 @@ use ansi_term::Color::{Blue, Purple};
 use clap::{App, Arg, SubCommand};
 use ordermap::OrderMap;
 
-use config::ReposIterator;
 use invocation::Invocation;
 
 /// Name of the command (`config`).
@@ -44,27 +43,23 @@ pub fn run(invocation: &Invocation) {
             println!("\n{}{}", style.paint("TAG:"), style.paint(tag));
             print_repos_config(
                 invocation,
-                invocation.config().repos_tagged(tag),
+                &mut invocation.config().paths_for_tag(tag),
             )
         }
     } else {
         println!();
-        print_repos_config(invocation, invocation.config().repos_iter())
+        print_repos_config(invocation, &mut invocation.config().paths())
     }
     println!()
 }
 
-/// Prints configuration for repos in `repos`.
+/// Prints configuration for repos at `paths`.
 #[cfg_attr(feature = "cargo-clippy", allow(print_stdout))]
-fn print_repos_config(invocation: &Invocation, repos: ReposIterator) {
+fn print_repos_config(invocation: &Invocation, paths: &mut Vec<&str>) {
     let verbose = invocation.matches().is_present(VERBOSE_ARG);
 
-    // Sort by path so the output order is deterministic and
-    // reasonably sane.
-    let mut paths = Vec::new();
-    for repo in repos {
-        paths.push(repo.path())
-    }
+    // By default paths are sorted by name. For config, we want them
+    // sorted by the path (since that is the "header" we're printing).
     paths.sort();
 
     for path in paths {
