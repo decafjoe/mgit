@@ -2,3 +2,6 @@
 name = "mgit"
 version = "0.3.0"
 authors = ["Joe Joyce <joe@decafjoe.com>"]
+
+[dependencies]
+clap = { version = "~2.29.0", features = ["wrap_help"] }
