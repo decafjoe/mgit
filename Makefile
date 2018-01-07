@@ -35,7 +35,7 @@ check : test fmt lint
 
 
 doc :
-	cd $(ROOT); $(CARGO) doc
+	cd $(ROOT); $(CARGO) rustdoc -- --document-private-items
 
 
 dev :
