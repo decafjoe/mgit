@@ -1,6 +1,7 @@
 //! Top-level application code, state management, and program control.
 use std::process;
 
+use ansi_term::Color;
 use clap::{App, Arg, ArgMatches};
 
 /// Name for the `-W/--warning` argument.
@@ -40,7 +41,9 @@ pub fn run(matches: &ArgMatches) -> Control {
         ),
     };
     let control = Control::new(warning_action);
-    control.warning("this is a test warning"); // TODO(jjoyce): kill this
+    // TODO(jjoyce): kill the following two lines
+    control.warning("this is a test warning\nwith multiple lines");
+    control.fatal("this is a fatal\nalso with multiple lines\nand a third");
     control
 }
 
@@ -73,6 +76,29 @@ impl Control {
         }
     }
 
+    /// Prints error condition to stdout.
+    ///
+    /// `label` indicates the type of the condition, `"warning"` or
+    /// `"  fatal"` (the labels are "manually" aligned).
+    ///
+    /// `color` indicates the color for the `label`. The color will be
+    /// `bold()`-ed.
+    ///
+    /// `message` is the message to print to stderr. If the message
+    /// contains multiple lines, lines subsequent to the first are
+    /// indented to `label.len()` plus one.
+    fn print(&self, label: &str, color: Color, message: &str) {
+        let mut s = String::from("");
+        for _ in 0..label.len() {
+            s.push_str(" ");
+        }
+        let empty = s.as_str();
+        for (i, line) in message.lines().enumerate() {
+            let margin = if i == 0 { label } else { empty };
+            eprintln!("{} {}", color.bold().paint(margin), line);
+        }
+    }
+
     /// Registers a warning with the specified `message`.
     ///
     /// The action taken depends on the `warning_action` supplied to
@@ -85,7 +111,7 @@ impl Control {
     ///   fatal.
     pub fn warning(&self, message: &str) {
         if self.warning_action != Action::Ignore {
-            eprintln!("{}", message);
+            self.print("warning", Color::Yellow, message);
             if self.warning_action == Action::Fatal {
                 self.fatal("encountered warning, warning action is 'fatal'");
             }
@@ -95,7 +121,7 @@ impl Control {
     /// Prints `message` to stderr, then exits the process with an
     /// exit code of `1`.
     pub fn fatal(&self, message: &str) {
-        eprintln!("{}", message);
+        self.print("  fatal", Color::Red, message);
         process::exit(1);
     }
 }

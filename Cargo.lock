@@ -51,6 +51,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "mgit"
 version = "0.3.0"
 dependencies = [
+ "ansi_term 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.29.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

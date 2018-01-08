@@ -1,4 +1,5 @@
 //! Library that drives mgit.
+extern crate ansi_term;
 #[macro_use]
 extern crate clap;
 

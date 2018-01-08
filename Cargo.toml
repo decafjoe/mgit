@@ -4,4 +4,5 @@ version = "0.3.0"
 authors = ["Joe Joyce <joe@decafjoe.com>"]
 
 [dependencies]
+ansi_term = "~0.10.2"
 clap = { version = "~2.29.0", features = ["wrap_help"] }
