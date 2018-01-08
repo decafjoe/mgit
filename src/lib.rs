@@ -4,6 +4,7 @@ extern crate ansi_term;
 extern crate clap;
 
 mod app;
+mod cfg;
 mod cmd;
 
 /// Entry point for the program.
@@ -14,7 +15,7 @@ pub fn main() {
         .subcommand(cmd::status::subcommand())
         .get_matches();
 
-    let control = app::run(&matches);
+    let (control, _config) = app::run(&matches);
 
     if matches.subcommand_matches(cmd::config::NAME).is_some() {
         cmd::config::run(&app::Invocation::new(&control));

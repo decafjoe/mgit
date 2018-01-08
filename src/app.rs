@@ -1,9 +1,13 @@
 //! Top-level application code, state management, and program control.
 use std::process;
 
-use ansi_term::Color;
+use ansi_term::{Color, Style};
 use clap::{App, Arg, ArgMatches};
 
+use cfg::Config;
+
+/// Name for the `-c/--config` argument.
+const CONFIG_ARG: &str = "CONFIG";
 /// Name for the `-W/--warning` argument.
 const WARNING_ARG: &str = "WARNING";
 
@@ -13,6 +17,16 @@ pub fn app<'a>() -> App<'a, 'a> {
         .version(crate_version!())
         .author(crate_authors!())
         .about("Small program for managing multiple git repositories.")
+        .arg(
+            Arg::with_name(CONFIG_ARG)
+                .default_value("~/.mgit")
+                .help("Path to configuration file or directory")
+                .short("c")
+                .long("config")
+                .multiple(true)
+                .number_of_values(1)
+                .value_name("PATH"),
+        )
         .arg(
             Arg::with_name(WARNING_ARG)
                 .default_value("print")
@@ -27,7 +41,9 @@ pub fn app<'a>() -> App<'a, 'a> {
 
 /// Runs the application with the specified `matches`, returning
 /// initialized state/control instances.
-pub fn run(matches: &ArgMatches) -> Control {
+pub fn run(matches: &ArgMatches) -> (Control, Config) {
+    // Pull out provided arguments. Per the configuration in `app()`,
+    // clap should make sure none of this ever actually panics.
     let warning_action_value = matches
         .value_of(WARNING_ARG)
         .expect("no value for warning action argument");
@@ -40,11 +56,38 @@ pub fn run(matches: &ArgMatches) -> Control {
             warning_action_value
         ),
     };
+    let config_paths = matches
+        .values_of(CONFIG_ARG)
+        .expect("no value for config argument");
+
+    // Read the configuration from the provided `-c/--config` paths,
+    // passing errors from the config reader to the control instance,
+    // as warnings.
     let control = Control::new(warning_action);
-    // TODO(jjoyce): kill the following two lines
-    control.warning("this is a test warning\nwith multiple lines");
-    control.fatal("this is a fatal\nalso with multiple lines\nand a third");
-    control
+    let mut config = Config::new();
+    for path in config_paths {
+        for error in config.read(path) {
+            let mut s =
+                format!("{}", Style::new().bold().paint(error.message()));
+            if let Some(cause) = error.cause() {
+                s.push_str(&format!("\n{}", cause));
+            }
+            s.push_str(&format!(
+                "\nin config at path {}",
+                Color::Cyan.bold().paint(error.config_path())
+            ));
+            if let Some(repo_path) = error.repo_path() {
+                s.push_str(&format!(
+                    "\nfor repo  at path {}",
+                    Color::Blue.bold().paint(repo_path)
+                ));
+            }
+            control.warning(s.as_str());
+        }
+    }
+
+    // Return and transfer ownership of control and config instances.
+    (control, config)
 }
 
 // ----- Action ---------------------------------------------------------------
