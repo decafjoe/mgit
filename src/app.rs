@@ -4,7 +4,7 @@ use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::iter::Iterator;
-use std::path::{PathBuf, MAIN_SEPARATOR};
+use std::path::{Path, PathBuf, MAIN_SEPARATOR};
 use std::process;
 
 use ansi_term::{Color, Style};
@@ -393,9 +393,14 @@ impl Repo {
     pub fn name_or_default(&self) -> &str {
         if let Some(ref name) = self.name {
             name.as_str()
+        } else if self.path == format!("{}", MAIN_SEPARATOR) {
+            "<root>"
         } else {
-            // TODO(jjoyce): implement this
-            "<default-name>"
+            Path::new(&self.path)
+                .file_name()
+                .expect("failed to get file_name from repo path")
+                .to_str()
+                .expect("failed to convert file_name to str")
         }
     }
 
