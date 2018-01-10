@@ -77,7 +77,7 @@ pub fn run(invocation: &Invocation) {
             // (taking `verbose` into consideration).
             let mut info = OrderMap::new();
             info.insert("config", repo.config_path());
-            // TODO(jjoyce): insert("path", absolute_path_to_repo)
+            info.insert("path", repo.full_path());
             match repo.name() {
                 Some(name) => {
                     info.insert("name", name);
@@ -103,7 +103,7 @@ pub fn run(invocation: &Invocation) {
                 // 2500 is "─" (light horizontal box drawing character)
                 let mut h = String::from("\u{2500}");
                 // Left-pad with light horizontal bar
-                for _ in 0..7 - key.len() {
+                for _ in 0..6 - key.len() {
                     h.push_str("\u{2500}");
                 }
                 h.push_str(" ");

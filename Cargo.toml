@@ -6,5 +6,9 @@ authors = ["Joe Joyce <joe@decafjoe.com>"]
 [dependencies]
 ansi_term = "~0.10.2"
 clap = { version = "~2.29.0", features = ["wrap_help"] }
+git2 = "~0.6.11"
 ordermap = "~0.3.4"
 pager = "~0.14.0"
+rust-ini = "~0.10.0"
+users = "~0.6.0"
+walkdir = "~2.0.1"
