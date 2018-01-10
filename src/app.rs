@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
+use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR};
@@ -412,6 +413,36 @@ impl Repo {
         } else {
             DEFAULT_SYMBOL
         }
+    }
+
+    /// Returns a new `git2::Repository` instance for this repo.
+    pub fn git(&self) -> Repository {
+        Repository::open(&self.full_path).expect(&format!(
+            "failed to open git repository at '{}'",
+            self.full_path
+        ))
+    }
+}
+
+impl PartialEq for Repo {
+    /// Checks equality by comparing user-specified paths.
+    ///
+    /// When obtained via the `Config` instance (the only "supported"
+    /// way to use `Repo` instances), paths are guaranteed to be
+    /// unique.
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path()
+    }
+}
+
+impl Eq for Repo {}
+
+impl Hash for Repo {
+    /// Uses the user-specified path for the hash value.
+    ///
+    /// See the note on `eq()` about uniqueness.
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.path.hash(state);
     }
 }
 
