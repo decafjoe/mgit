@@ -586,7 +586,6 @@ impl Config {
     /// (e.g. a file defines a repository that has already been
     /// configured, repository path does not exist or is not a git
     /// repo).
-    #[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
     fn read(&mut self, path: &str) -> Vec<Error> {
         let path_str = path;
         let path = match resolve_path(path, None) {
