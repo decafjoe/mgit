@@ -1,10 +1,20 @@
 //! Top-level application code, state management, and program control.
+use std::collections::HashMap;
+use std::env;
+use std::fs::File;
+use std::io::Read;
 use std::iter::Iterator;
+use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::process;
 
 use ansi_term::{Color, Style};
 use clap::{App, Arg, ArgMatches};
+use git2::Repository;
+use ini::Ini;
 use pager::Pager;
+use users;
+use users::os::unix::UserExt;
+use walkdir::WalkDir;
 
 /// Name for the `-c/--config` argument.
 const CONFIG_ARG: &str = "CONFIG";
@@ -86,8 +96,140 @@ pub fn run(matches: &ArgMatches) -> (Control, Config) {
         }
     }
 
+    if config.repos().len() == 0 {
+        control.fatal("no repositories configured");
+    }
+
     // Return and transfer ownership of control and config instances.
     (control, config)
+}
+
+// ----- ResolveError ---------------------------------------------------------
+
+/// Represents an error during resolution of a user-supplied path.
+struct ResolveError {
+    /// Message describing the resolution error.
+    message: String,
+}
+
+impl ResolveError {
+    /// Creates and returns a new `ResolveError` instance.
+    fn new(message: &str) -> Self {
+        Self {
+            message: message.to_owned(),
+        }
+    }
+
+    /// Returns the message describing the error.
+    fn message(&self) -> &str {
+        self.message.as_str()
+    }
+}
+
+// ----- resolve_path ---------------------------------------------------------
+
+/// Resolves the given `path`.
+///
+/// If the path starts with `~`, this tries to resolve it to a user
+/// home directory (or a subdirectory thereof).
+///
+/// If the path starts with the system `MAIN_SEPARATOR`, it's assumed
+/// to be absolute and is left unchanged.
+///
+/// Otherwise, the path is assumed to be relative. If `relative_to`
+/// does not have a value (i.e. is `None`) then the current working
+/// directory is used for `relative_to`.
+///
+/// Once the path has been resolved per the above, it is canonicalized
+/// using `std::fs::canonicalize` and finally returned.
+fn resolve_path(
+    path: &str,
+    relative_to: Option<&str>,
+) -> Result<PathBuf, ResolveError> {
+    let mut relative_to = match relative_to {
+        Some(path) => {
+            // Caller passed relative_to. If a directory, return
+            // as-is. Otherwise, figure out the directory containing
+            // the path and return that.
+            let buf = PathBuf::from(path);
+            if buf.is_dir() {
+                buf
+            } else {
+                match buf.parent() {
+                    Some(path) => path.to_path_buf(),
+                    None => {
+                        return Err(ResolveError::new(&format!(
+                            "could not get parent of relative_to ({})",
+                            path
+                        )))
+                    }
+                }
+            }
+        }
+        None => match env::current_dir() {
+            Ok(buf) => buf,
+            Err(e) => {
+                return Err(ResolveError::new(&format!(
+                    "could not get cwd ({})",
+                    e
+                )))
+            }
+        },
+    };
+    let path = if path.starts_with('~') {
+        // Check for `~` or `~/...` -- i.e. a bare tilde, meaning the
+        // current user.
+        if path.len() == 1
+            || path.chars().nth(1).expect("could not get second char")
+                == MAIN_SEPARATOR
+        {
+            let uid = users::get_current_uid();
+            if let Some(user) = users::get_user_by_uid(uid) {
+                let mut buf = user.home_dir().to_path_buf();
+                if path.len() > 2 {
+                    buf.push(&path[2..]);
+                }
+                buf
+            } else {
+                return Err(ResolveError::new(&format!(
+                    "failed to look up user info for uid {}",
+                    uid
+                )));
+            }
+        } else {
+            // Fully specified user (e.g. `~foo/...`) -- extract
+            // username and look up home directory.
+            let name =
+                path[1..].split(MAIN_SEPARATOR).nth(0).expect(&format!(
+                    "splitting '{}' on MAIN_SEPARATOR ('{}') failed",
+                    path, MAIN_SEPARATOR
+                ));
+            if let Some(user) = users::get_user_by_name(name) {
+                let mut buf = user.home_dir().to_path_buf();
+                if path.len() > name.len() + 1 {
+                    buf.push(&path[(name.len() + 2)..]);
+                }
+                buf
+            } else {
+                return Err(ResolveError::new(&format!(
+                    "failed to look up user info for username '{}'",
+                    name
+                )));
+            }
+        }
+    } else if path.starts_with(MAIN_SEPARATOR) {
+        PathBuf::from(path)
+    } else {
+        relative_to.push(path);
+        relative_to
+    };
+    match path.canonicalize() {
+        Ok(path) => Ok(path),
+        Err(e) => Err(ResolveError::new(&format!(
+            "failed to canonicalize path ({})",
+            e
+        ))),
+    }
 }
 
 // ----- Error ----------------------------------------------------------------
@@ -169,6 +311,8 @@ pub struct Repo {
     config_path: String,
     /// Path to the repository itself, as specified by the user.
     path: String,
+    /// Fully-resolved, absolute path to the repository.
+    full_path: String,
     /// Optional human-friendly name for the repo.
     name: Option<String>,
     /// Optional "symbol" for the repo – the character that precedes
@@ -183,6 +327,7 @@ impl Repo {
     fn new(
         config_path: &str,
         path: &str,
+        full_path: &str,
         name: Option<&str>,
         symbol: Option<&str>,
         tags: &[&str],
@@ -190,6 +335,7 @@ impl Repo {
         Self {
             config_path: config_path.to_owned(),
             path: path.to_owned(),
+            full_path: full_path.to_owned(),
             name: match name {
                 Some(name) => Some(name.to_owned()),
                 None => None,
@@ -211,6 +357,11 @@ impl Repo {
     /// Returns the path to the repo, as specified by the end user.
     pub fn path(&self) -> &str {
         self.path.as_str()
+    }
+
+    /// Returns the full path to the repo.
+    pub fn full_path(&self) -> &str {
+        self.full_path.as_str()
     }
 
     /// Returns the (optionally-set) name of the repository.
@@ -352,6 +503,11 @@ impl<'a> Iter<'a> {
             sorted: self.sorted,
         }
     }
+
+    /// Returns the number of repos in the `Iter`.
+    fn len(&self) -> usize {
+        self.repos.len()
+    }
 }
 
 impl<'a> Iterator for Iter<'a> {
@@ -385,6 +541,13 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 // ----- Config ---------------------------------------------------------------
+
+/// Configuration key that specifies repo name.
+const NAME_KEY: &str = "name";
+/// Configuration key that specifies repo symbol.
+const SYMBOL_KEY: &str = "symbol";
+/// Configuration key that specifies repo tags.
+const TAGS_KEY: &str = "tags";
 
 /// Configuration as specified by the end user.
 pub struct Config {
@@ -423,68 +586,183 @@ impl Config {
     /// (e.g. a file defines a repository that has already been
     /// configured, repository path does not exist or is not a git
     /// repo).
+    #[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
     fn read(&mut self, path: &str) -> Vec<Error> {
-        // TODO(jjoyce): kill this and replace with a real impl
-        self.repos.push(Repo::new(
-            "/home/jjoyce/.mgit/personal.conf",
-            "~/.emacs.d",
-            Some("emacs.d"),
-            None,
-            vec!["personal"].as_slice(),
-        ));
-        self.repos.push(Repo::new(
-            "/home/jjoyce/.mgit/personal.conf",
-            "~/clik",
-            None,
-            Some("\u{2283}"),
-            vec!["personal", "github", "clik"].as_slice(),
-        ));
-        self.repos.push(Repo::new(
-            "/home/jjoyce/.mgit/personal.conf",
-            "~/clik-shell",
-            None,
-            Some("\u{2283}"),
-            vec!["personal", "github", "clik"].as_slice(),
-        ));
-        self.repos.push(Repo::new(
-            "/home/jjoyce/.mgit/personal.conf",
-            "~/clik-wtforms",
-            None,
-            Some("\u{2283}"),
-            vec!["personal", "github", "clik"].as_slice(),
-        ));
-        self.repos.push(Repo::new(
-            "/home/jjoyce/.mgit/personal.conf",
-            "~/mgit",
-            None,
-            None,
-            vec!["personal", "github"].as_slice(),
-        ));
+        let path_str = path;
+        let path = match resolve_path(path, None) {
+            Ok(buf) => buf,
+            Err(e) => {
+                return vec![
+                    Error::new(
+                        path_str,
+                        None,
+                        "failed to resolve config path",
+                        Some(e.message()),
+                    ),
+                ]
+            }
+        };
+
         let mut rv = Vec::new();
-        rv.push(Error::new(
-            path,
-            None,
-            "something went wrong before parsing",
-            None,
-        ));
-        rv.push(Error::new(
-            path,
-            None,
-            "another pre-parsing warning",
-            Some("this is the reason for that one"),
-        ));
-        rv.push(Error::new(
-            path,
-            Some("~/mgit"),
-            "and here we have a problem inside the config",
-            None,
-        ));
-        rv.push(Error::new(
-            path,
-            Some("~/mgit"),
-            "this is a fully specified error, with all the things",
-            Some("underlying cause for the failure inside the config"),
-        ));
+        let mut paths = Vec::new();
+        if path.is_file() {
+            paths.push(path);
+        } else if path.is_dir() {
+            for entry in WalkDir::new(&path) {
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(e) => {
+                        rv.push(Error::new(
+                            path_str,
+                            None,
+                            "failure when walking directory",
+                            Some(&format!("{}", e)),
+                        ));
+                        continue;
+                    }
+                };
+                if entry.path().is_file() {
+                    if let Some(extension) = entry.path().extension() {
+                        if extension == "conf" {
+                            paths.push(entry.path().to_path_buf());
+                        }
+                    }
+                }
+            }
+        } else {
+            rv.push(Error::new(
+                path_str,
+                None,
+                "path is not a file or directory",
+                None,
+            ));
+        }
+
+        let mut full_paths = HashMap::new();
+        for repo in &self.repos {
+            full_paths.insert(
+                repo.full_path().to_owned(),
+                repo.config_path().to_owned(),
+            );
+        }
+
+        for path in paths {
+            let path_str = if let Some(s) = path.to_str() {
+                s
+            } else {
+                rv.push(Error::new(
+                    path_str,
+                    None,
+                    "subpath contains invalid unicode",
+                    None,
+                ));
+                continue;
+            };
+            let mut f = match File::open(&path) {
+                Ok(f) => f,
+                Err(e) => {
+                    rv.push(Error::new(
+                        path_str,
+                        None,
+                        "failed to open file",
+                        Some(&format!("{}", e)),
+                    ));
+                    continue;
+                }
+            };
+            let mut s = String::new();
+            if let Err(e) = f.read_to_string(&mut s) {
+                rv.push(Error::new(
+                    path_str,
+                    None,
+                    "failed to read file",
+                    Some(&format!("{}", e)),
+                ));
+                continue;
+            }
+            let ini = match Ini::load_from_str(&s) {
+                Ok(ini) => ini,
+                Err(e) => {
+                    rv.push(Error::new(
+                        path_str,
+                        None,
+                        "failed to parse file",
+                        Some(&format!("{}", e)),
+                    ));
+                    continue;
+                }
+            };
+            for (section, settings) in &ini {
+                let repo_path = if let Some(ref path) = *section {
+                    path
+                } else {
+                    continue;
+                };
+                let full_path = match resolve_path(repo_path, Some(path_str)) {
+                    Ok(path) => path,
+                    Err(e) => {
+                        rv.push(Error::new(
+                            path_str,
+                            Some(repo_path),
+                            "failed to resolve repo path",
+                            Some(e.message()),
+                        ));
+                        continue;
+                    }
+                };
+                let full_path_str = if let Some(s) = full_path.to_str() {
+                    s
+                } else {
+                    rv.push(Error::new(
+                        path_str,
+                        Some(repo_path),
+                        "absolute path contains invalid unicode",
+                        None,
+                    ));
+                    continue;
+                };
+                if let Some(config_path) = full_paths.get(full_path_str) {
+                    rv.push(Error::new(
+                        path_str,
+                        Some(repo_path),
+                        "repo is already configured (ignoring new definition)",
+                        Some(&format!("first configured in {}", config_path)),
+                    ));
+                    continue;
+                }
+                if let Err(e) = Repository::open(&full_path) {
+                    rv.push(Error::new(
+                        path_str,
+                        Some(repo_path),
+                        "failed to open repository",
+                        Some(e.message()),
+                    ));
+                    continue;
+                }
+                let tags = match settings.get(TAGS_KEY) {
+                    Some(s) => s.split_whitespace().collect::<Vec<&str>>(),
+                    None => vec![],
+                };
+                let repo = Repo::new(
+                    path_str,
+                    repo_path,
+                    full_path_str,
+                    match settings.get(NAME_KEY) {
+                        Some(s) => Some(s.as_str()),
+                        None => None,
+                    },
+                    match settings.get(SYMBOL_KEY) {
+                        Some(s) => Some(s.as_str()),
+                        None => None,
+                    },
+                    tags.as_slice(),
+                );
+                full_paths
+                    .insert(full_path_str.to_owned(), path_str.to_owned());
+                self.repos.push(repo);
+            }
+        }
+
         rv
     }
 }
