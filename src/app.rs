@@ -526,9 +526,9 @@ impl<'a> Iterator for Iter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         if !self.sorted {
             let field = &self.sort_field;
-            self.repos.sort_by_key(|r| match *field {
-                Field::Name => (r.name_or_default(), r.path()),
-                Field::Path => (r.path(), ""),
+            self.repos.sort_by_key(|repo| match *field {
+                Field::Name => (repo.name_or_default(), repo.path()),
+                Field::Path => (repo.path(), ""),
             });
             self.sorted = true;
         }
