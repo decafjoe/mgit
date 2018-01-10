@@ -37,6 +37,7 @@ extern crate walkdir;
 
 mod app;
 mod cmd;
+mod ui;
 
 /// Entry point for the program.
 pub fn main() {
