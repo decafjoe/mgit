@@ -8,9 +8,9 @@ use app::{Field, Invocation};
 /// Name of the command (`config`).
 pub const NAME: &str = "config";
 
-/// Name of the argument for tags.
+/// Name of the argument for `-t/--tag`.
 const TAG_ARG: &str = "TAG";
-/// Name of the argument for verbose output.
+/// Name of the argument for `-v/--verbose`.
 const VERBOSE_ARG: &str = "VERBOSE";
 
 /// Returns configured clap subcommand for `config`.
