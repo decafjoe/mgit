@@ -93,7 +93,7 @@ pub fn run(matches: &ArgMatches) -> (Control, Config) {
                     Color::Blue.bold().paint(repo_path)
                 ));
             }
-            control.warning(s.as_str());
+            control.warning(&s);
         }
     }
 
@@ -123,7 +123,7 @@ impl ResolveError {
 
     /// Returns the message describing the error.
     fn message(&self) -> &str {
-        self.message.as_str()
+        &self.message
     }
 }
 
@@ -257,8 +257,8 @@ impl Error {
     ) -> Self {
         Self {
             config_path: config_path.to_owned(),
-            repo_path: if let Some(repo_path) = repo_path {
-                Some(repo_path.to_owned())
+            repo_path: if let Some(path) = repo_path {
+                Some(path.to_owned())
             } else {
                 None
             },
@@ -274,7 +274,7 @@ impl Error {
     /// Returns the underlying cause of the error.
     fn cause(&self) -> Option<&str> {
         if let Some(ref cause) = self.cause {
-            Some(cause.as_str())
+            Some(cause)
         } else {
             None
         }
@@ -282,19 +282,19 @@ impl Error {
 
     /// Returns the configuration path associated with the error.
     fn config_path(&self) -> &str {
-        self.config_path.as_str()
+        &self.config_path
     }
 
     /// Returns the message describing the error.
     fn message(&self) -> &str {
-        self.message.as_str()
+        &self.message
     }
 
     /// Returns the path of the associated repository, if relevant for
     /// this error.
     fn repo_path(&self) -> Option<&str> {
-        if let Some(ref repo_path) = self.repo_path {
-            Some(repo_path.as_str())
+        if let Some(ref path) = self.repo_path {
+            Some(path)
         } else {
             None
         }
@@ -352,23 +352,23 @@ impl Repo {
     /// Returns path of configuration file in which this repo was
     /// defined.
     pub fn config_path(&self) -> &str {
-        self.config_path.as_str()
+        &self.config_path
     }
 
     /// Returns the path to the repo, as specified by the end user.
     pub fn path(&self) -> &str {
-        self.path.as_str()
+        &self.path
     }
 
     /// Returns the full path to the repo.
     pub fn full_path(&self) -> &str {
-        self.full_path.as_str()
+        &self.full_path
     }
 
     /// Returns the (optionally-set) name of the repository.
     pub fn name(&self) -> Option<&str> {
         match self.name {
-            Some(ref name) => Some(name.as_str()),
+            Some(ref name) => Some(name),
             None => None,
         }
     }
@@ -376,7 +376,7 @@ impl Repo {
     /// Returns the (optionally-set) symbol the repository.
     pub fn symbol(&self) -> Option<&str> {
         match self.symbol {
-            Some(ref symbol) => Some(symbol.as_str()),
+            Some(ref symbol) => Some(symbol),
             None => None,
         }
     }
@@ -393,7 +393,7 @@ impl Repo {
     /// from the `path`.
     pub fn name_or_default(&self) -> &str {
         if let Some(ref name) = self.name {
-            name.as_str()
+            name
         } else if self.path == format!("{}", MAIN_SEPARATOR) {
             "<root>"
         } else {
@@ -409,7 +409,7 @@ impl Repo {
     /// `DEFAULT_SYMBOL`.
     pub fn symbol_or_default(&self) -> &str {
         if let Some(ref symbol) = self.symbol {
-            symbol.as_str()
+            symbol
         } else {
             DEFAULT_SYMBOL
         }
@@ -783,11 +783,11 @@ impl Config {
                     repo_path,
                     full_path_str,
                     match settings.get(NAME_KEY) {
-                        Some(s) => Some(s.as_str()),
+                        Some(s) => Some(s),
                         None => None,
                     },
                     match settings.get(SYMBOL_KEY) {
-                        Some(s) => Some(s.as_str()),
+                        Some(s) => Some(s),
                         None => None,
                     },
                     tags.as_slice(),
@@ -843,13 +843,12 @@ impl Control {
     /// contains multiple lines, lines subsequent to the first are
     /// indented to `label.len()` plus one.
     fn print(&self, label: &str, color: Color, message: &str) {
-        let mut s = String::from("");
+        let mut empty = String::from("");
         for _ in 0..label.len() {
-            s.push_str(" ");
+            empty.push_str(" ");
         }
-        let empty = s.as_str();
         for (i, line) in message.lines().enumerate() {
-            let margin = if i == 0 { label } else { empty };
+            let margin = if i == 0 { label } else { &empty };
             eprintln!("{} {}", color.bold().paint(margin), line);
         }
     }

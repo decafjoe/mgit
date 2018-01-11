@@ -50,7 +50,7 @@ impl Note {
 
     /// Returns the message for this note.
     pub fn message(&self) -> &str {
-        self.message.as_str()
+        &self.message
     }
 }
 
