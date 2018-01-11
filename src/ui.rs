@@ -114,7 +114,7 @@ impl Summary {
 
     /// Adds a new `Note` to this summary. Takes ownership of the
     /// `note` instance.
-    pub fn add_note(&mut self, note: Note) {
+    pub fn push_note(&mut self, note: Note) {
         self.notes.push(note)
     }
 

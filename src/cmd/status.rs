@@ -108,7 +108,7 @@ pub fn run(invocation: &Invocation) {
                             )
                         })
                         .count();
-                    summary.add_note(note_for_status(
+                    summary.push_note(note_for_status(
                         STATUS_INDEXED_GROUP,
                         indexed,
                         "changed in index but uncommitted",
@@ -124,7 +124,7 @@ pub fn run(invocation: &Invocation) {
                             )
                         })
                         .count();
-                    summary.add_note(note_for_status(
+                    summary.push_note(note_for_status(
                         STATUS_MODIFIED_GROUP,
                         modified,
                         "modified",
@@ -137,13 +137,13 @@ pub fn run(invocation: &Invocation) {
                                 .intersects(git2::STATUS_WT_NEW)
                         })
                         .count();
-                    summary.add_note(note_for_status(
+                    summary.push_note(note_for_status(
                         STATUS_UNTRACKED_GROUP,
                         untracked,
                         "untracked",
                     ));
                 } else {
-                    summary.add_note(Note::new(
+                    summary.push_note(Note::new(
                         STATUS_FAILURE_GROUP,
                         Kind::Failure,
                         "failed to get status info",
@@ -155,7 +155,7 @@ pub fn run(invocation: &Invocation) {
                         let local = match branch {
                             Ok((local, _)) => local,
                             Err(e) => {
-                                summary.add_note(Note::new(
+                                summary.push_note(Note::new(
                                     BRANCH_FAILURE_GROUP,
                                     Kind::Failure,
                                     &format!(
@@ -171,7 +171,7 @@ pub fn run(invocation: &Invocation) {
                             Ok(name) => if let Some(name) = name {
                                 name
                             } else {
-                                summary.add_note(Note::new(
+                                summary.push_note(Note::new(
                                     BRANCH_FAILURE_GROUP,
                                     Kind::Failure,
                                     "local branch name is not valid utf-8",
@@ -179,7 +179,7 @@ pub fn run(invocation: &Invocation) {
                                 continue;
                             },
                             Err(e) => {
-                                summary.add_note(Note::new(
+                                summary.push_note(Note::new(
                                     BRANCH_FAILURE_GROUP,
                                     Kind::Failure,
                                     &format!(
@@ -195,7 +195,7 @@ pub fn run(invocation: &Invocation) {
                         {
                             oid
                         } else {
-                            summary.add_note(Note::new(
+                            summary.push_note(Note::new(
                                 BRANCH_FAILURE_GROUP,
                                 Kind::Failure,
                                 &format!(
@@ -218,7 +218,7 @@ pub fn run(invocation: &Invocation) {
                             Ok(name) => if let Some(name) = name {
                                 name
                             } else {
-                                summary.add_note(Note::new(
+                                summary.push_note(Note::new(
                                     BRANCH_FAILURE_GROUP,
                                     Kind::Failure,
                                     &format!(
@@ -230,7 +230,7 @@ pub fn run(invocation: &Invocation) {
                                 continue;
                             },
                             Err(e) => {
-                                summary.add_note(Note::new(
+                                summary.push_note(Note::new(
                                     BRANCH_FAILURE_GROUP,
                                     Kind::Failure,
                                     &format!(
@@ -246,7 +246,7 @@ pub fn run(invocation: &Invocation) {
                             if let Some(oid) = upstream.get().target() {
                                 oid
                             } else {
-                                summary.add_note(Note::new(
+                                summary.push_note(Note::new(
                                     BRANCH_FAILURE_GROUP,
                                     Kind::Failure,
                                     &format!(
@@ -263,7 +263,7 @@ pub fn run(invocation: &Invocation) {
                         ) {
                             Ok((ahead, behind)) => (ahead, behind),
                             Err(e) => {
-                                summary.add_note(Note::new(
+                                summary.push_note(Note::new(
                                     BRANCH_FAILURE_GROUP,
                                     Kind::Failure,
                                     &format!(
@@ -277,7 +277,7 @@ pub fn run(invocation: &Invocation) {
                             }
                         };
                         if ahead > 0 && behind > 0 {
-                            summary.add_note(Note::new(
+                            summary.push_note(Note::new(
                                 BRANCH_STATUS_GROUP,
                                 Kind::Failure,
                                 &format!(
@@ -288,7 +288,7 @@ pub fn run(invocation: &Invocation) {
                             ));
                         } else if ahead > 0 {
                             let s = if ahead == 1 { "" } else { "s" };
-                            summary.add_note(Note::new(
+                            summary.push_note(Note::new(
                                 BRANCH_STATUS_GROUP,
                                 Kind::Warning,
                                 &format!(
@@ -298,7 +298,7 @@ pub fn run(invocation: &Invocation) {
                             ));
                         } else if behind > 0 {
                             let s = if ahead == 1 { "" } else { "s" };
-                            summary.add_note(Note::new(
+                            summary.push_note(Note::new(
                                 BRANCH_STATUS_GROUP,
                                 Kind::Failure,
                                 &format!(
@@ -307,7 +307,7 @@ pub fn run(invocation: &Invocation) {
                                 ),
                             ));
                         } else {
-                            summary.add_note(Note::new(
+                            summary.push_note(Note::new(
                                 BRANCH_STATUS_GROUP,
                                 Kind::None,
                                 &format!(
@@ -318,7 +318,7 @@ pub fn run(invocation: &Invocation) {
                         }
                     },
                     Err(e) => {
-                        summary.add_note(Note::new(
+                        summary.push_note(Note::new(
                             BRANCH_FAILURE_GROUP,
                             Kind::Failure,
                             &format!(
