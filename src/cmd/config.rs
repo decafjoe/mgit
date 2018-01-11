@@ -94,7 +94,7 @@ pub fn run(invocation: &Invocation) {
                     info.insert("symbol", symbol_default);
                 },
             }
-            info.insert("tags", tags.as_str());
+            info.insert("tags", &tags);
 
             // Pretty-print information, "keyed" by the user-specified
             // path from the configuration.
