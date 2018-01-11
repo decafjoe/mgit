@@ -4,10 +4,10 @@ use std::collections::HashMap;
 use ansi_term::{Color, Style};
 use clap::{App, Arg, SubCommand};
 use git2;
-use git2::{BranchType, StatusOptions, StatusShow};
+use git2::{StatusOptions, StatusShow};
 
 use app::{Invocation, Repo};
-use ui::{Kind, Note, Summary};
+use ui::{Kind, Note, Summary, TrackingBranches};
 
 /// Name of the command (`status`).
 pub const NAME: &str = "status";
@@ -150,113 +150,32 @@ pub fn run(invocation: &Invocation) {
                     ));
                 }
 
-                match git.branches(Some(BranchType::Local)) {
-                    Ok(branches) => for branch in branches {
-                        let local = match branch {
-                            Ok((local, _)) => local,
-                            Err(e) => {
-                                summary.push_note(Note::new(
-                                    BRANCH_FAILURE_GROUP,
-                                    Kind::Failure,
-                                    &format!(
-                                        "failed to get info for local branch \
-                                         ({})",
-                                        e
-                                    ),
-                                ));
-                                continue;
-                            }
-                        };
-                        let local_name = match local.name() {
-                            Ok(name) => if let Some(name) = name {
-                                name
-                            } else {
-                                summary.push_note(Note::new(
-                                    BRANCH_FAILURE_GROUP,
-                                    Kind::Failure,
-                                    "local branch name is not valid utf-8",
-                                ));
-                                continue;
-                            },
-                            Err(e) => {
-                                summary.push_note(Note::new(
-                                    BRANCH_FAILURE_GROUP,
-                                    Kind::Failure,
-                                    &format!(
-                                        "failed to get name of local branch \
-                                         ({})",
-                                        e
-                                    ),
-                                ));
-                                continue;
-                            }
-                        };
-                        let local_oid = if let Some(oid) = local.get().target()
-                        {
-                            oid
-                        } else {
-                            summary.push_note(Note::new(
-                                BRANCH_FAILURE_GROUP,
-                                Kind::Failure,
-                                &format!(
-                                    "failed to resolve oid for local branch \
-                                     '{}'",
-                                    local_name
-                                ),
+                match TrackingBranches::for_repository(&git) {
+                    Ok(branches) => for local in branches {
+                        // The checks in `TrackingBranches` should
+                        // mean these never actually panic.
+                        let local_name = local
+                            .name()
+                            .expect("failed to get name for local branch")
+                            .expect("local branch name is not valid utf-8");
+                        let local_oid = local.get().target().expect(&format!(
+                                "failed to get oid for local branch {}",
+                                local_name
                             ));
-                            continue;
-                        };
-                        let upstream = if let Ok(upstream) = local.upstream() {
-                            upstream
-                        } else {
-                            // Assume there is no upstream branch
-                            // (though technically this could be an
-                            // actual error).
-                            continue;
-                        };
-                        let upstream_name = match upstream.name() {
-                            Ok(name) => if let Some(name) = name {
-                                name
-                            } else {
-                                summary.push_note(Note::new(
-                                    BRANCH_FAILURE_GROUP,
-                                    Kind::Failure,
-                                    &format!(
-                                        "upstream branch name for local \
-                                         branch '{}' is not valid utf-8",
-                                        local_name
-                                    ),
-                                ));
-                                continue;
-                            },
-                            Err(e) => {
-                                summary.push_note(Note::new(
-                                    BRANCH_FAILURE_GROUP,
-                                    Kind::Failure,
-                                    &format!(
-                                        "failed to get name of upstream \
-                                         branch for local branch '{}' ({})",
-                                        local_name, e
-                                    ),
-                                ));
-                                continue;
-                            }
-                        };
+                        let upstream = local.upstream().expect(&format!(
+                            "failed to upstream for local branch {}",
+                            local_name
+                        ));
+                        let upstream_name = upstream
+                            .name()
+                            .expect("failed to get name for upstream branch")
+                            .expect("upstream branch name is not valid utf-8");
                         let upstream_oid =
-                            if let Some(oid) = upstream.get().target() {
-                                oid
-                            } else {
-                                summary.push_note(Note::new(
-                                    BRANCH_FAILURE_GROUP,
-                                    Kind::Failure,
-                                    &format!(
-                                        "failed to resolve oid for upstream \
-                                         branch '{}'",
-                                        upstream_name
-                                    ),
-                                ));
-                                continue;
-                            };
+                            upstream.get().target().expect(&format!(
+                                "failed to get oid for upstream branch {} \
+                                 (local branch {})",
+                                upstream_name, local_name
+                            ));
                         let (ahead, behind) = match git.graph_ahead_behind(
                             local_oid,
                             upstream_oid,
@@ -268,8 +187,8 @@ pub fn run(invocation: &Invocation) {
                                     Kind::Failure,
                                     &format!(
                                         "failed to determine relationship \
-                                         between local branch '{}' and \
-                                         upstream branch '{}' ({})",
+                                         between local branch {} and \
+                                         upstream branch {} ({})",
                                         local_name, upstream_name, e,
                                     ),
                                 ));
@@ -317,16 +236,13 @@ pub fn run(invocation: &Invocation) {
                             ));
                         }
                     },
-                    Err(e) => {
+                    Err(errors) => for error in errors {
                         summary.push_note(Note::new(
                             BRANCH_FAILURE_GROUP,
                             Kind::Failure,
-                            &format!(
-                                "failed to fetch local branch data ({})",
-                                e
-                            ),
+                            error.message(),
                         ));
-                    }
+                    },
                 }
 
                 cache.insert(repo, summary);

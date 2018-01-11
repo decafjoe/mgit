@@ -1,6 +1,10 @@
 //! Common UI components.
 use std::iter::Iterator;
 
+use git2::{Branch, BranchType, Repository};
+
+use app::Error;
+
 // ----- Kind ---------------------------------------------------------------
 
 /// Generic indicator for "result" or "status."
@@ -141,5 +145,148 @@ impl Summary {
             }
         }
         rv
+    }
+}
+
+// ----- TrackingBranches -----------------------------------------------------
+
+/// Convenience iterator for iterating through tracking branches.
+///
+/// The main feature of this struct is the validation done on
+/// initialization. For each local branch this checks:
+///
+/// * That the branch has an upstream (if not, the branch will not be
+///   yielded from the iterator)
+/// * That the local branch has a (valid utf-8) name
+/// * That we can get the local branch's oid
+/// * That the upstream branch has a (valid utf-8) name
+/// * That we can get the upstream branch's oid
+///
+/// As a result, for branches yielded from this iterator, it is safe
+/// to unwrap the values returned by the git2 API for name and oid.
+pub struct TrackingBranches<'repo> {
+    branches: Vec<Branch<'repo>>,
+}
+
+impl<'repo> TrackingBranches<'repo> {
+    /// Creates and returns a new `TrackingBranches` iterator for the
+    /// repository `git`.
+    pub fn for_repository(git: &'repo Repository) -> Result<Self, Vec<Error>> {
+        match TrackingBranches::get(git) {
+            Ok(branches) => Ok(Self { branches: branches }),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Returns a vec of local `Branch` references that represent
+    /// valid (per the description in the struct documentation) local
+    /// branch references.
+    fn get(git: &'repo Repository) -> Result<Vec<Branch<'repo>>, Vec<Error>> {
+        let branches = match git.branches(Some(BranchType::Local)) {
+            Ok(branches) => branches,
+            Err(e) => {
+                return Err(vec![
+                    Error::new(&format!(
+                        "failed to fetch local branch data ({})",
+                        e
+                    )),
+                ]);
+            }
+        };
+        let mut rv = Vec::new();
+        let mut errors = Vec::new();
+        for branch in branches {
+            let local = match branch {
+                Ok((local, _)) => local,
+                Err(e) => {
+                    errors.push(Error::new(&format!(
+                        "failed to get info for local branch ({})",
+                        e
+                    )));
+                    continue;
+                }
+            };
+            {
+                let local_name = match local.name() {
+                    Ok(name) => if let Some(name) = name {
+                        name
+                    } else {
+                        errors.push(Error::new(
+                            "local branch name is not valid utf-8",
+                        ));
+                        continue;
+                    },
+                    Err(e) => {
+                        errors.push(Error::new(&format!(
+                            "failed to get name of local branch ({})",
+                            e
+                        )));
+                        continue;
+                    }
+                };
+                if local.get().target().is_none() {
+                    errors.push(Error::new(&format!(
+                        "failed to resolve oid for local branch {}",
+                        local_name
+                    )));
+                    continue;
+                }
+                let upstream = if let Ok(upstream) = local.upstream() {
+                    upstream
+                } else {
+                    // Assume there is no upstream branch (though
+                    // technically this could be an actual error).
+                    continue;
+                };
+                let upstream_name = match upstream.name() {
+                    Ok(name) => if let Some(name) = name {
+                        name
+                    } else {
+                        errors.push(Error::new(&format!(
+                            "upstream branch name for local branch '{}' is \
+                             not valid utf-8",
+                            local_name
+                        )));
+                        continue;
+                    },
+                    Err(e) => {
+                        errors.push(Error::new(&format!(
+                            "failed to get name of upstream branch for local \
+                             branch {} ({})",
+                            local_name, e
+                        )));
+                        continue;
+                    }
+                };
+                if upstream.get().target().is_none() {
+                    errors.push(Error::new(&format!(
+                        "failed to resolve oid for upstream branch {} (local \
+                         branch is {})",
+                        upstream_name, local_name
+                    )));
+                    continue;
+                }
+            }
+            rv.push(local);
+        }
+
+        if errors.is_empty() {
+            Ok(rv)
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+impl<'repo> Iterator for TrackingBranches<'repo> {
+    type Item = Branch<'repo>;
+
+    /// Returns the next local branch (if any) for this iterator.
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.branches.is_empty() {
+            None
+        } else {
+            Some(self.branches.remove(0))
+        }
     }
 }
