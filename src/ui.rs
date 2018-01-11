@@ -164,14 +164,14 @@ impl Summary {
 ///
 /// As a result, for branches yielded from this iterator, it is safe
 /// to unwrap the values returned by the git2 API for name and oid.
-pub struct TrackingBranches<'repo> {
-    branches: Vec<Branch<'repo>>,
+pub struct TrackingBranches<'a> {
+    branches: Vec<Branch<'a>>,
 }
 
-impl<'repo> TrackingBranches<'repo> {
+impl<'a> TrackingBranches<'a> {
     /// Creates and returns a new `TrackingBranches` iterator for the
     /// repository `git`.
-    pub fn for_repository(git: &'repo Repository) -> Result<Self, Vec<Error>> {
+    pub fn for_repository(git: &'a Repository) -> Result<Self, Vec<Error>> {
         match TrackingBranches::get(git) {
             Ok(branches) => Ok(Self { branches: branches }),
             Err(e) => Err(e),
@@ -181,7 +181,7 @@ impl<'repo> TrackingBranches<'repo> {
     /// Returns a vec of local `Branch` references that represent
     /// valid (per the description in the struct documentation) local
     /// branch references.
-    fn get(git: &'repo Repository) -> Result<Vec<Branch<'repo>>, Vec<Error>> {
+    fn get(git: &'a Repository) -> Result<Vec<Branch<'a>>, Vec<Error>> {
         let branches = match git.branches(Some(BranchType::Local)) {
             Ok(branches) => branches,
             Err(e) => {
@@ -278,8 +278,8 @@ impl<'repo> TrackingBranches<'repo> {
     }
 }
 
-impl<'repo> Iterator for TrackingBranches<'repo> {
-    type Item = Branch<'repo>;
+impl<'a> Iterator for TrackingBranches<'a> {
+    type Item = Branch<'a>;
 
     /// Returns the next local branch (if any) for this iterator.
     fn next(&mut self) -> Option<Self::Item> {
