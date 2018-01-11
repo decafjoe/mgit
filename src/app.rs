@@ -108,21 +108,21 @@ pub fn run(matches: &ArgMatches) -> (Control, Config) {
 // ----- Error ----------------------------------------------------------------
 
 /// Represents a basic error.
-struct Error {
+pub struct Error {
     /// Message describing the error.
     message: String,
 }
 
 impl Error {
     /// Creates and returns a new `Error` instance.
-    fn new(message: &str) -> Self {
+    pub fn new(message: &str) -> Self {
         Self {
             message: message.to_owned(),
         }
     }
 
     /// Returns the message describing the error.
-    fn message(&self) -> &str {
+    pub fn message(&self) -> &str {
         &self.message
     }
 }
