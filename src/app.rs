@@ -105,16 +105,16 @@ pub fn run(matches: &ArgMatches) -> (Control, Config) {
     (control, config)
 }
 
-// ----- ResolveError ---------------------------------------------------------
+// ----- Error ----------------------------------------------------------------
 
-/// Represents an error during resolution of a user-supplied path.
-struct ResolveError {
-    /// Message describing the resolution error.
+/// Represents a basic error.
+struct Error {
+    /// Message describing the error.
     message: String,
 }
 
-impl ResolveError {
-    /// Creates and returns a new `ResolveError` instance.
+impl Error {
+    /// Creates and returns a new `Error` instance.
     fn new(message: &str) -> Self {
         Self {
             message: message.to_owned(),
@@ -137,17 +137,14 @@ impl ResolveError {
 /// If the path starts with the system `MAIN_SEPARATOR`, it's assumed
 /// to be absolute and is left unchanged.
 ///
-/// Otherwise, the path is assumed to be relative. If `relative_to`
+/// Otherwise, the path is assumed to be relative to `rel`. If `rel`
 /// does not have a value (i.e. is `None`) then the current working
-/// directory is used for `relative_to`.
+/// directory is used.
 ///
 /// Once the path has been resolved per the above, it is canonicalized
 /// using `std::fs::canonicalize` and finally returned.
-fn resolve_path(
-    path: &str,
-    relative_to: Option<&str>,
-) -> Result<PathBuf, ResolveError> {
-    let mut relative_to = match relative_to {
+fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
+    let mut relative_to = match rel {
         Some(path) => {
             // Caller passed relative_to. If a directory, return
             // as-is. Otherwise, figure out the directory containing
@@ -159,7 +156,7 @@ fn resolve_path(
                 match buf.parent() {
                     Some(path) => path.to_path_buf(),
                     None => {
-                        return Err(ResolveError::new(&format!(
+                        return Err(Error::new(&format!(
                             "could not get parent of relative_to ({})",
                             path
                         )))
@@ -170,10 +167,7 @@ fn resolve_path(
         None => match env::current_dir() {
             Ok(buf) => buf,
             Err(e) => {
-                return Err(ResolveError::new(&format!(
-                    "could not get cwd ({})",
-                    e
-                )))
+                return Err(Error::new(&format!("could not get cwd ({})", e)))
             }
         },
     };
@@ -192,7 +186,7 @@ fn resolve_path(
                 }
                 buf
             } else {
-                return Err(ResolveError::new(&format!(
+                return Err(Error::new(&format!(
                     "failed to look up user info for uid {}",
                     uid
                 )));
@@ -212,7 +206,7 @@ fn resolve_path(
                 }
                 buf
             } else {
-                return Err(ResolveError::new(&format!(
+                return Err(Error::new(&format!(
                     "failed to look up user info for username '{}'",
                     name
                 )));
@@ -226,17 +220,16 @@ fn resolve_path(
     };
     match path.canonicalize() {
         Ok(path) => Ok(path),
-        Err(e) => Err(ResolveError::new(&format!(
-            "failed to canonicalize path ({})",
-            e
-        ))),
+        Err(e) => {
+            Err(Error::new(&format!("failed to canonicalize path ({})", e)))
+        }
     }
 }
 
-// ----- Error ----------------------------------------------------------------
+// ----- ConfigError ----------------------------------------------------------
 
 /// Represents an error encountered when reading configuration.
-struct Error {
+struct ConfigError {
     /// Configuration path associated with the error.
     config_path: String,
     /// Path of the repository, if relevant for this error.
@@ -247,8 +240,8 @@ struct Error {
     cause: Option<String>,
 }
 
-impl Error {
-    /// Creates and returns a new `Error` instance.
+impl ConfigError {
+    /// Creates and returns a new `ConfigError` instance.
     fn new(
         config_path: &str,
         repo_path: Option<&str>,
@@ -622,13 +615,13 @@ impl Config {
     /// (e.g. a file defines a repository that has already been
     /// configured, repository path does not exist or is not a git
     /// repo).
-    fn read(&mut self, path: &str) -> Vec<Error> {
+    fn read(&mut self, path: &str) -> Vec<ConfigError> {
         let path_str = path;
         let path = match resolve_path(path, None) {
             Ok(buf) => buf,
             Err(e) => {
                 return vec![
-                    Error::new(
+                    ConfigError::new(
                         path_str,
                         None,
                         "failed to resolve config path",
@@ -647,7 +640,7 @@ impl Config {
                 let entry = match entry {
                     Ok(entry) => entry,
                     Err(e) => {
-                        rv.push(Error::new(
+                        rv.push(ConfigError::new(
                             path_str,
                             None,
                             "failure when walking directory",
@@ -665,7 +658,7 @@ impl Config {
                 }
             }
         } else {
-            rv.push(Error::new(
+            rv.push(ConfigError::new(
                 path_str,
                 None,
                 "path is not a file or directory",
@@ -685,7 +678,7 @@ impl Config {
             let path_str = if let Some(s) = path.to_str() {
                 s
             } else {
-                rv.push(Error::new(
+                rv.push(ConfigError::new(
                     path_str,
                     None,
                     "subpath contains invalid unicode",
@@ -696,7 +689,7 @@ impl Config {
             let mut f = match File::open(&path) {
                 Ok(f) => f,
                 Err(e) => {
-                    rv.push(Error::new(
+                    rv.push(ConfigError::new(
                         path_str,
                         None,
                         "failed to open file",
@@ -707,7 +700,7 @@ impl Config {
             };
             let mut s = String::new();
             if let Err(e) = f.read_to_string(&mut s) {
-                rv.push(Error::new(
+                rv.push(ConfigError::new(
                     path_str,
                     None,
                     "failed to read file",
@@ -718,7 +711,7 @@ impl Config {
             let ini = match Ini::load_from_str(&s) {
                 Ok(ini) => ini,
                 Err(e) => {
-                    rv.push(Error::new(
+                    rv.push(ConfigError::new(
                         path_str,
                         None,
                         "failed to parse file",
@@ -736,7 +729,7 @@ impl Config {
                 let full_path = match resolve_path(repo_path, Some(path_str)) {
                     Ok(path) => path,
                     Err(e) => {
-                        rv.push(Error::new(
+                        rv.push(ConfigError::new(
                             path_str,
                             Some(repo_path),
                             "failed to resolve repo path",
@@ -748,7 +741,7 @@ impl Config {
                 let full_path_str = if let Some(s) = full_path.to_str() {
                     s
                 } else {
-                    rv.push(Error::new(
+                    rv.push(ConfigError::new(
                         path_str,
                         Some(repo_path),
                         "absolute path contains invalid unicode",
@@ -757,7 +750,7 @@ impl Config {
                     continue;
                 };
                 if let Some(config_path) = full_paths.get(full_path_str) {
-                    rv.push(Error::new(
+                    rv.push(ConfigError::new(
                         path_str,
                         Some(repo_path),
                         "repo is already configured (ignoring new definition)",
@@ -766,7 +759,7 @@ impl Config {
                     continue;
                 }
                 if let Err(e) = Repository::open(&full_path) {
-                    rv.push(Error::new(
+                    rv.push(ConfigError::new(
                         path_str,
                         Some(repo_path),
                         "failed to open repository",
