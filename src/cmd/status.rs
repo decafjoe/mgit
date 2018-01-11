@@ -153,34 +153,12 @@ pub fn run(invocation: &Invocation) {
                 }
 
                 match TrackingBranches::for_repository(&git) {
-                    Ok(branches) => for local in branches {
-                        // The checks in `TrackingBranches` should
-                        // mean these never actually panic.
-                        let local_name = local
-                            .name()
-                            .expect("failed to get name for local branch")
-                            .expect("local branch name is not valid utf-8");
-                        let local_oid = local.get().target().expect(&format!(
-                                "failed to get oid for local branch {}",
-                                local_name
-                            ));
-                        let upstream = local.upstream().expect(&format!(
-                            "failed to upstream for local branch {}",
-                            local_name
-                        ));
-                        let upstream_name = upstream
-                            .name()
-                            .expect("failed to get name for upstream branch")
-                            .expect("upstream branch name is not valid utf-8");
-                        let upstream_oid =
-                            upstream.get().target().expect(&format!(
-                                "failed to get oid for upstream branch {} \
-                                 (local branch {})",
-                                upstream_name, local_name
-                            ));
+                    Ok(branches) => for branch in branches {
+                        let local_name = branch.local_name();
+                        let upstream_name = branch.upstream_name();
                         let (ahead, behind) = match git.graph_ahead_behind(
-                            local_oid,
-                            upstream_oid,
+                            branch.local_oid(),
+                            branch.upstream_oid(),
                         ) {
                             Ok((ahead, behind)) => (ahead, behind),
                             Err(e) => {
