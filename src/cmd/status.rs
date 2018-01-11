@@ -19,14 +19,16 @@ const VERBOSE_ARG: &str = "VERBOSE";
 
 /// Group number for errors encountered when fetching statuses.
 const STATUS_FAILURE_GROUP: usize = 0;
+/// Group number for errors encountered when getting branch status.
+const BRANCH_FAILURE_GROUP: usize = 1;
+
 /// Group number for files that are changed in index but uncommitted.
 const STATUS_INDEXED_GROUP: usize = 10;
 /// Group number for modified files.
 const STATUS_MODIFIED_GROUP: usize = 11;
 /// Group number for untracked files.
 const STATUS_UNTRACKED_GROUP: usize = 12;
-/// Group number for errors encountered when getting branch status.
-const BRANCH_FAILURE_GROUP: usize = 1;
+
 /// Group number for branch status messages.
 const BRANCH_STATUS_GROUP: usize = 110;
 
