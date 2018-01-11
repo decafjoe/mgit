@@ -1,7 +1,7 @@
 //! Common UI components.
 use std::iter::Iterator;
 
-use git2::{Branch, BranchType, Repository};
+use git2::{Branch, BranchType, Oid, Repository};
 
 use app::Error;
 
@@ -148,6 +148,63 @@ impl Summary {
     }
 }
 
+// ----- TrackingBranch -------------------------------------------------------
+
+/// Convenience wrapper for a tracking branch.
+pub struct TrackingBranch<'a> {
+    /// Local `Branch` reference.
+    branch: Branch<'a>,
+}
+
+impl<'a> TrackingBranch<'a> {
+    /// Creates and returns a new `TrackingBranch` instance for local
+    /// `branch`.
+    fn new(branch: Branch<'a>) -> Self {
+        Self { branch: branch }
+    }
+
+    /// Returns the name of the local branch.
+    pub fn local_name(&self) -> String {
+        self.branch
+            .name()
+            .expect("failed to get name for local branch")
+            .expect("local branch name is not valid utf-8")
+            .to_owned()
+    }
+
+    /// Returns the oid of the local branch.
+    pub fn local_oid(&self) -> Oid {
+        self.branch
+            .get()
+            .target()
+            .expect("failed to get oid for local branch")
+    }
+
+    /// Returns a reference to the upstream branch.
+    pub fn upstream(&self) -> Branch {
+        self.branch
+            .upstream()
+            .expect("failed to get upstream for local branch")
+    }
+
+    /// Returns the name of the upstream branch.
+    pub fn upstream_name(&self) -> String {
+        self.upstream()
+            .name()
+            .expect("failed to get name for upstream branch")
+            .expect("upstream branch name is not valid utf-8")
+            .to_owned()
+    }
+
+    /// Returns the oid of the upstream branch.
+    pub fn upstream_oid(&self) -> Oid {
+        self.upstream()
+            .get()
+            .target()
+            .expect("failed to get oid for upstream branch")
+    }
+}
+
 // ----- TrackingBranches -----------------------------------------------------
 
 /// Convenience iterator for iterating through tracking branches.
@@ -165,7 +222,7 @@ impl Summary {
 /// As a result, for branches yielded from this iterator, it is safe
 /// to unwrap the values returned by the git2 API for name and oid.
 pub struct TrackingBranches<'a> {
-    branches: Vec<Branch<'a>>,
+    branches: Vec<TrackingBranch<'a>>,
 }
 
 impl<'a> TrackingBranches<'a> {
@@ -178,10 +235,12 @@ impl<'a> TrackingBranches<'a> {
         }
     }
 
-    /// Returns a vec of local `Branch` references that represent
-    /// valid (per the description in the struct documentation) local
-    /// branch references.
-    fn get(git: &'a Repository) -> Result<Vec<Branch<'a>>, Vec<Error>> {
+    /// Returns a vec of local `TrackingBranch` references that
+    /// represent valid (per the description in the struct
+    /// documentation) local branch references.
+    fn get(
+        git: &'a Repository,
+    ) -> Result<Vec<TrackingBranch<'a>>, Vec<Error>> {
         let branches = match git.branches(Some(BranchType::Local)) {
             Ok(branches) => branches,
             Err(e) => {
@@ -267,7 +326,7 @@ impl<'a> TrackingBranches<'a> {
                     continue;
                 }
             }
-            rv.push(local);
+            rv.push(TrackingBranch::new(local));
         }
 
         if errors.is_empty() {
@@ -279,7 +338,7 @@ impl<'a> TrackingBranches<'a> {
 }
 
 impl<'a> Iterator for TrackingBranches<'a> {
-    type Item = Branch<'a>;
+    type Item = TrackingBranch<'a>;
 
     /// Returns the next local branch (if any) for this iterator.
     fn next(&mut self) -> Option<Self::Item> {
