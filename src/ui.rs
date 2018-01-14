@@ -23,6 +23,7 @@ pub enum Kind {
 // ----- Note -----------------------------------------------------------------
 
 /// Represents an item in a `Summary`.
+#[derive(Clone)]
 pub struct Note {
     /// Group for the note, used during `Summary` sort.
     group: usize,
@@ -222,6 +223,7 @@ impl<'a> TrackingBranch<'a> {
 /// As a result, for branches yielded from this iterator, it is safe
 /// to unwrap the values returned by the git2 API for name and oid.
 pub struct TrackingBranches<'a> {
+    /// `Vec` of tracking branches remaining to be iterated through.
     branches: Vec<TrackingBranch<'a>>,
 }
 
