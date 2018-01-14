@@ -28,10 +28,12 @@
 extern crate ansi_term;
 #[macro_use]
 extern crate clap;
+extern crate crossbeam;
 extern crate git2;
 extern crate ini;
 extern crate ordermap;
 extern crate pager;
+extern crate termion;
 extern crate users;
 extern crate walkdir;
 
