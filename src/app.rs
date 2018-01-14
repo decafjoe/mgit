@@ -359,6 +359,7 @@ impl Repo {
     }
 
     /// Returns the (optionally-set) name of the repository.
+    #[cfg_attr(feature = "cargo-clippy", allow(match_as_ref))]
     pub fn name(&self) -> Option<&str> {
         match self.name {
             Some(ref name) => Some(name),
@@ -367,6 +368,7 @@ impl Repo {
     }
 
     /// Returns the (optionally-set) symbol the repository.
+    #[cfg_attr(feature = "cargo-clippy", allow(match_as_ref))]
     pub fn symbol(&self) -> Option<&str> {
         match self.symbol {
             Some(ref symbol) => Some(symbol),
