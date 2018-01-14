@@ -123,6 +123,16 @@ impl Summary {
         self.notes.push(note)
     }
 
+    /// Adds the contents of `other` summary to this summary.
+    ///
+    /// Note that this copies the `Note` instances referenced by
+    /// `other`.
+    pub fn push_summary(&mut self, other: &Self) {
+        for note in other.notes() {
+            self.notes.push(note.clone());
+        }
+    }
+
     /// Returns a slice of `Note` references for this summary.
     fn notes(&self) -> &[Note] {
         self.notes.as_slice()
@@ -162,6 +172,11 @@ impl<'a> TrackingBranch<'a> {
     /// `branch`.
     fn new(branch: Branch<'a>) -> Self {
         Self { branch: branch }
+    }
+
+    /// Returns a reference to the local branch.
+    pub fn local(&self) -> &Branch {
+        &self.branch
     }
 
     /// Returns the name of the local branch.
@@ -233,6 +248,29 @@ impl<'a> TrackingBranches<'a> {
     pub fn for_repository(git: &'a Repository) -> Result<Self, Vec<Error>> {
         match TrackingBranches::get(git) {
             Ok(branches) => Ok(Self { branches: branches }),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Creates and returns a new `TrackingBranches` iterator for the
+    /// repository `git`, limited to tracking branches whose upstream
+    /// is the remote named `name`.
+    pub fn for_remote(
+        git: &'a Repository,
+        name: &str,
+    ) -> Result<Self, Vec<Error>> {
+        match TrackingBranches::get(git) {
+            Ok(branches) => {
+                let mut remote_branches = Vec::new();
+                for branch in branches {
+                    if branch.upstream_name().starts_with(name) {
+                        remote_branches.push(branch);
+                    }
+                }
+                Ok(Self {
+                    branches: remote_branches,
+                })
+            }
             Err(e) => Err(e),
         }
     }
