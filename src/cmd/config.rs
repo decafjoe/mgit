@@ -94,7 +94,9 @@ pub fn run(invocation: &Invocation) {
                     info.insert("symbol", symbol_default);
                 },
             }
-            info.insert("tags", &tags);
+            if verbose || !tags_vec.is_empty() {
+                info.insert("tags", &tags);
+            }
 
             // Pretty-print information, "keyed" by the user-specified
             // path from the configuration.
