@@ -1,5 +1,22 @@
 # mgit
 
+## Table of Contents
+
+* [Intro](#intro)
+* [Installation](#installation)
+* [Configuration](#configuration)
+  * [Tags](#tags)
+  * [Checks](#checks)
+* [Usage](#usage)
+  * [Help](#help)
+  * [Config](#config)
+  * [Warnings](#warnings)
+  * [Status](#status)
+  * [Pull](#pull)
+
+
+## Intro
+
 mgit is a command-line application for managing multiple git
 repositories.
 
@@ -40,7 +57,6 @@ fetch succeeds, mgit looks at each tracking branch.
 In other words: `mgit pull` tries to avoid doing stupid or dangerous
 things. The only changes that are made are (1) fetching from remotes
 and (2) simple fast-forwards. Otherwise mgit leaves your repos alone.
-
 
 ## Installation
 
