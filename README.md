@@ -261,9 +261,11 @@ color code. For repositories:
 * Green – at least one tracking branch was fast-forwarded to its
   upstream
 * Yellow – at least one tracking branch is ahead of its upstream
-* Red – at least one tracking branch has diverged from its upstream,
-  or the tracking branch is HEAD and could not be fast-forwarded due
-  to a dirty worktree
+* Red
+  * Fetch failed, or
+  * At least one tracking branch has diverged from its upstream, or
+  * A tracking branch was HEAD, was behind its upstream, but could not
+    be fast-forwarded due to a dirty worktree
   
 For remotes (note that "tracking branches" means "tracking branches
 whose upstream branch is on this remote"):
