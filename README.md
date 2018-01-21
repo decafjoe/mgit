@@ -283,18 +283,12 @@ color code. For repositories:
   * A tracking branch was HEAD, was behind its upstream, but could not
     be fast-forwarded due to a dirty worktree
   
-For remotes (note that "tracking branches" means "tracking branches
-whose upstream branch is on this remote"):
+For remotes, the color codes above mean the same thing, except
+"tracking branches" means "tracking branches whose upstream branch is
+on this remote." There are two additional color codes for remotes:
 
 * Blue – the fetch has not yet been started
 * Cyan – the fetch is in progress
-* White – all tracking branches are up-to-date
-* Green – at least one tracking branch was fast-forwarded to its
-  upstream
-* Yellow – at least one tracking branch is ahead of its upstream
-* Red – at least one tracking branch has diverged from its upstream,
-  or the tracking branch is HEAD and could not be fast-forwarded due
-  to a dirty worktree
   
 By default, mgit will do eight concurrent fetches. You can override
 this by specifying the `-c/--concurrent` argument to `pull`:
