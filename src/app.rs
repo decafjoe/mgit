@@ -462,13 +462,13 @@ pub enum Field {
 ///
 /// ```rust,ignore
 /// for (path, repo) in config
-///     .repos()
-///     .iter_field(Field::Path)
-///     .iter_field(Field::Name) // this and the next line are completely
-///     .iter_field(Field::Path) // superfluous of course, but not an error
-///     .sorted_by(Field::Path)
-///     .sorted_by(Field::Name) // same as above
-///     .sorted_by(Field::Path)
+/// .repos()
+/// .iter_field(Field::Path)
+/// .iter_field(Field::Name) // this and the next line are completely
+/// .iter_field(Field::Path) // superfluous of course, but not an error
+/// .sorted_by(Field::Path)
+/// .sorted_by(Field::Name) // same as above
+/// .sorted_by(Field::Path)
 /// {
 ///     // do stuff with path and repo
 /// }
