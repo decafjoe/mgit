@@ -638,7 +638,8 @@ impl<'a, W: Write> UI<'a, W> {
     ///
     /// **This is an internal method and should not be called outside
     /// the impl.**
-    #[cfg_attr(feature = "cargo-clippy", allow(cast_possible_truncation))]
+    #[cfg_attr(feature = "cargo-clippy",
+               allow(cast_possible_truncation, many_single_char_names))]
     fn draw(&mut self, w: u16, h: u16, results: &Results) {
         // We do some calculations where we need width and height as a
         // usize, so we just assign them some variables.
