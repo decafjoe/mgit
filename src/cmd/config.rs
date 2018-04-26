@@ -1,7 +1,7 @@
 //! `config` subcommand.
 use ansi_term::{Color, Style};
 use clap::{App, Arg, SubCommand};
-use ordermap::OrderMap;
+use indexmap::IndexMap;
 
 use app::{Field, Invocation};
 
@@ -75,7 +75,7 @@ pub fn run(invocation: &Invocation) {
             // draw ┖ on the last line instead of ┠, and we don't know
             // what the last line is until we look at all the settings
             // (taking `verbose` into consideration).
-            let mut info = OrderMap::new();
+            let mut info = IndexMap::new();
             info.insert("config", repo.config_path());
             info.insert("path", repo.full_path());
             match repo.name() {
