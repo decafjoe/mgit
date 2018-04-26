@@ -3,8 +3,7 @@ use std::collections::HashMap;
 
 use ansi_term::{Color, Style};
 use clap::{App, Arg, SubCommand};
-use git2;
-use git2::{StatusOptions, StatusShow};
+use git2::{Status, StatusOptions, StatusShow};
 
 use app::{Invocation, Repo};
 use ui::{Kind, Note, Summary, TrackingBranches};
@@ -102,11 +101,10 @@ pub fn run(invocation: &Invocation) {
                         .iter()
                         .filter(|status_entry| {
                             status_entry.status().intersects(
-                                git2::STATUS_INDEX_DELETED
-                                    | git2::STATUS_INDEX_MODIFIED
-                                    | git2::STATUS_INDEX_NEW
-                                    | git2::STATUS_INDEX_RENAMED
-                                    | git2::STATUS_INDEX_TYPECHANGE,
+                                Status::INDEX_DELETED | Status::INDEX_MODIFIED
+                                    | Status::INDEX_NEW
+                                    | Status::INDEX_RENAMED
+                                    | Status::INDEX_TYPECHANGE,
                             )
                         })
                         .count();
@@ -119,10 +117,9 @@ pub fn run(invocation: &Invocation) {
                         .iter()
                         .filter(|status_entry| {
                             status_entry.status().intersects(
-                                git2::STATUS_WT_DELETED
-                                    | git2::STATUS_WT_MODIFIED
-                                    | git2::STATUS_WT_RENAMED
-                                    | git2::STATUS_WT_TYPECHANGE,
+                                Status::WT_DELETED | Status::WT_MODIFIED
+                                    | Status::WT_RENAMED
+                                    | Status::WT_TYPECHANGE,
                             )
                         })
                         .count();
@@ -134,9 +131,7 @@ pub fn run(invocation: &Invocation) {
                     let untracked = statuses
                         .iter()
                         .filter(|status_entry| {
-                            status_entry
-                                .status()
-                                .intersects(git2::STATUS_WT_NEW)
+                            status_entry.status().intersects(Status::WT_NEW)
                         })
                         .count();
                     summary.push_note(note_for_status(
