@@ -1,20 +1,21 @@
 //! Top-level application code, state management, and program control.
-use std::collections::HashMap;
-use std::env;
-use std::fs::File;
-use std::hash::{Hash, Hasher};
-use std::io::Read;
-use std::iter::Iterator;
-use std::path::{Path, PathBuf, MAIN_SEPARATOR};
-use std::process;
+use std::{
+    collections::HashMap,
+    env,
+    fs::File,
+    hash::{Hash, Hasher},
+    io::Read,
+    iter::Iterator,
+    path::{Path, PathBuf, MAIN_SEPARATOR},
+    process,
+};
 
 use ansi_term::{Color, Style};
 use clap::{App, Arg, ArgMatches};
 use git2::Repository;
 use ini::Ini;
 use pager::Pager;
-use users;
-use users::os::unix::UserExt;
+use users::{self, os::unix::UserExt};
 use walkdir::WalkDir;
 
 /// Name for the `-c/--config` argument.
@@ -160,22 +161,27 @@ fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
                             "could not get parent of relative_to ({})",
                             path
                         )))
-                    }
+                    },
                 }
             }
-        }
+        },
         None => match env::current_dir() {
             Ok(buf) => buf,
             Err(e) => {
-                return Err(Error::new(&format!("could not get cwd ({})", e)))
-            }
+                return Err(Error::new(&format!(
+                    "could not get cwd ({})",
+                    e
+                )))
+            },
         },
     };
     let path = if path.starts_with('~') {
         // Check for `~` or `~/...` -- i.e. a bare tilde, meaning the
         // current user.
         if path.len() == 1
-            || path.chars().nth(1).expect("could not get second char")
+            || path.chars()
+                .nth(1)
+                .expect("could not get second char")
                 == MAIN_SEPARATOR
         {
             let uid = users::get_current_uid();
@@ -194,11 +200,12 @@ fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
         } else {
             // Fully specified user (e.g. `~foo/...`) -- extract
             // username and look up home directory.
-            let name =
-                path[1..].split(MAIN_SEPARATOR).nth(0).expect(&format!(
+            let name = path[1..].split(MAIN_SEPARATOR).nth(0).expect(
+                &format!(
                     "splitting '{}' on MAIN_SEPARATOR ('{}') failed",
                     path, MAIN_SEPARATOR
-                ));
+                ),
+            );
             if let Some(user) = users::get_user_by_name(name) {
                 let mut buf = user.home_dir().to_path_buf();
                 if path.len() > name.len() + 1 {
@@ -220,9 +227,10 @@ fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
     };
     match path.canonicalize() {
         Ok(path) => Ok(path),
-        Err(e) => {
-            Err(Error::new(&format!("failed to canonicalize path ({})", e)))
-        }
+        Err(e) => Err(Error::new(&format!(
+            "failed to canonicalize path ({})",
+            e
+        ))),
     }
 }
 
@@ -589,7 +597,9 @@ pub struct Config {
 impl Config {
     /// Creates and returns a new, empty `Config` instance.
     fn new() -> Self {
-        Self { repos: Vec::new() }
+        Self {
+            repos: Vec::new(),
+        }
     }
 
     /// Returns an `Iter` instance over the repos in the
@@ -622,15 +632,13 @@ impl Config {
         let path = match resolve_path(path, None) {
             Ok(buf) => buf,
             Err(e) => {
-                return vec![
-                    ConfigError::new(
-                        path_str,
-                        None,
-                        "failed to resolve config path",
-                        Some(e.message()),
-                    ),
-                ]
-            }
+                return vec![ConfigError::new(
+                    path_str,
+                    None,
+                    "failed to resolve config path",
+                    Some(e.message()),
+                )]
+            },
         };
 
         let mut rv = Vec::new();
@@ -649,7 +657,7 @@ impl Config {
                             Some(&format!("{}", e)),
                         ));
                         continue;
-                    }
+                    },
                 };
                 if entry.path().is_file() {
                     if let Some(extension) = entry.path().extension() {
@@ -698,7 +706,7 @@ impl Config {
                         Some(&format!("{}", e)),
                     ));
                     continue;
-                }
+                },
             };
             let mut s = String::new();
             if let Err(e) = f.read_to_string(&mut s) {
@@ -720,7 +728,7 @@ impl Config {
                         Some(&format!("{}", e)),
                     ));
                     continue;
-                }
+                },
             };
             for (section, settings) in &ini {
                 let repo_path = if let Some(ref path) = *section {
@@ -738,7 +746,7 @@ impl Config {
                             Some(e.message()),
                         ));
                         continue;
-                    }
+                    },
                 };
                 let full_path_str = if let Some(s) = full_path.to_str() {
                     s

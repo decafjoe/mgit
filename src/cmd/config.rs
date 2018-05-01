@@ -41,12 +41,17 @@ pub fn run(invocation: &Invocation) {
     let header = Style::new().bold().underline();
     for (tag, repos) in invocation.iter_tags(TAG_ARG) {
         if let Some(tag) = tag {
-            println!("\n{}{}", header.paint("TAG:"), header.paint(tag));
+            println!(
+                "\n{}{}",
+                header.paint("TAG:"),
+                header.paint(tag)
+            );
         } else {
             println!();
         }
-        for (path, repo) in
-            repos.iter_field(Field::Path).sorted_by(Field::Path)
+        for (path, repo) in repos
+            .iter_field(Field::Path)
+            .sorted_by(Field::Path)
         {
             // Compute and take references to certain values. We do
             // this before creating the `info` map below so that
@@ -81,7 +86,7 @@ pub fn run(invocation: &Invocation) {
             match repo.name() {
                 Some(name) => {
                     info.insert("name", name);
-                }
+                },
                 None => if verbose {
                     info.insert("name", name_default);
                 },
@@ -89,7 +94,7 @@ pub fn run(invocation: &Invocation) {
             match repo.symbol() {
                 Some(symbol) => {
                     info.insert("symbol", symbol);
-                }
+                },
                 None => if verbose {
                     info.insert("symbol", symbol_default);
                 },
