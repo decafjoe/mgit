@@ -114,7 +114,9 @@ pub struct Summary {
 impl Summary {
     /// Creates and returns a new `Summary` instance.
     pub fn new() -> Self {
-        Self { notes: Vec::new() }
+        Self {
+            notes: Vec::new(),
+        }
     }
 
     /// Adds a new `Note` to this summary. Takes ownership of the
@@ -247,7 +249,9 @@ impl<'a> TrackingBranches<'a> {
     /// repository `git`.
     pub fn for_repository(git: &'a Repository) -> Result<Self, Vec<Error>> {
         match TrackingBranches::get(git) {
-            Ok(branches) => Ok(Self { branches: branches }),
+            Ok(branches) => Ok(Self {
+                branches: branches,
+            }),
             Err(e) => Err(e),
         }
     }
@@ -270,7 +274,7 @@ impl<'a> TrackingBranches<'a> {
                 Ok(Self {
                     branches: remote_branches,
                 })
-            }
+            },
             Err(e) => Err(e),
         }
     }
@@ -284,13 +288,11 @@ impl<'a> TrackingBranches<'a> {
         let branches = match git.branches(Some(BranchType::Local)) {
             Ok(branches) => branches,
             Err(e) => {
-                return Err(vec![
-                    Error::new(&format!(
-                        "failed to fetch local branch data ({})",
-                        e
-                    )),
-                ]);
-            }
+                return Err(vec![Error::new(&format!(
+                    "failed to fetch local branch data ({})",
+                    e
+                ))]);
+            },
         };
         let mut rv = Vec::new();
         let mut errors = Vec::new();
@@ -303,7 +305,7 @@ impl<'a> TrackingBranches<'a> {
                         e
                     )));
                     continue;
-                }
+                },
             };
             {
                 let local_name = match local.name() {
@@ -321,7 +323,7 @@ impl<'a> TrackingBranches<'a> {
                             e
                         )));
                         continue;
-                    }
+                    },
                 };
                 if local.get().target().is_none() {
                     errors.push(Error::new(&format!(
@@ -355,7 +357,7 @@ impl<'a> TrackingBranches<'a> {
                             local_name, e
                         )));
                         continue;
-                    }
+                    },
                 };
                 if upstream.get().target().is_none() {
                     errors.push(Error::new(&format!(

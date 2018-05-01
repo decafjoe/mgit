@@ -1,18 +1,23 @@
 //! `pull` subcommand.
-use std::collections::{HashMap, HashSet};
-use std::io::{stdout, Write};
-use std::process::Command;
-use std::sync::mpsc;
-use std::thread;
-use std::time::{Duration, Instant};
+use std::{
+    collections::{HashMap, HashSet},
+    io::{stdout, Write},
+    process::Command,
+    sync::mpsc,
+    thread,
+    time::{Duration, Instant},
+};
 
 use ansi_term::{Color, Style};
 use clap::{App, Arg, SubCommand};
 use crossbeam;
 use git2::{ObjectType, ResetType, StatusOptions, StatusShow};
-use termion;
-use termion::{clear, cursor};
-use termion::raw::{IntoRawMode, RawTerminal};
+use termion::{
+    self,
+    clear,
+    cursor,
+    raw::{IntoRawMode, RawTerminal},
+};
 
 use app::{Invocation, Repo};
 use ui::{Kind, Note, Summary, TrackingBranches};
@@ -77,7 +82,10 @@ pub fn run(invocation: &Invocation) {
     let concurrent_str = invocation
         .matches()
         .value_of(CONCURRENT_ARG)
-        .expect(&format!("{} to have an argument", CONCURRENT_ARG));
+        .expect(&format!(
+            "{} to have an argument",
+            CONCURRENT_ARG
+        ));
     let concurrent = match concurrent_str.parse::<u8>() {
         Ok(concurrent) => concurrent,
         Err(e) => {
@@ -85,7 +93,7 @@ pub fn run(invocation: &Invocation) {
                 "failed to interpret value '{}' for {} ({})",
                 concurrent_str, CONCURRENT_ARG, e
             ));
-        }
+        },
     };
     if concurrent < 1 {
         invocation.control().fatal(&format!(
@@ -151,7 +159,7 @@ pub fn run(invocation: &Invocation) {
                         Kind::Failure,
                         &format!("failed to get remotes ({})", e),
                     ));
-                }
+                },
             }
             results.insert(repo, summary);
         }
@@ -229,7 +237,11 @@ pub fn run(invocation: &Invocation) {
     let header = Style::new().bold().underline();
     for (tag, repos) in invocation.iter_tags(TAG_ARG) {
         if let Some(tag) = tag {
-            println!("\n{}{}", header.paint("TAG:"), header.paint(tag));
+            println!(
+                "\n{}{}",
+                header.paint("TAG:"),
+                header.paint(tag)
+            );
         } else {
             println!();
         }
@@ -375,7 +387,7 @@ fn fetch_and_ff(repo: &Repo, name: &str) -> Summary {
                             ),
                         ));
                         continue;
-                    }
+                    },
                 };
                 if ahead > 0 && behind > 0 {
                     summary.push_note(Note::new(
@@ -432,7 +444,7 @@ fn fetch_and_ff(repo: &Repo, name: &str) -> Summary {
                                     ),
                                 ));
                                 continue;
-                            }
+                            },
                         }
                     }
                     let ref_name = &format!("refs/heads/{}", local_name);
@@ -585,7 +597,9 @@ impl<'a, W: Write> UI<'a, W> {
 
     /// Adds remote named `remote` for repository `repo` to the UI.
     fn push_remote(&mut self, repo: &'a Repo, remote: &str) {
-        self.state.entry(repo).or_insert_with(HashMap::new);
+        self.state
+            .entry(repo)
+            .or_insert_with(HashMap::new);
         self.state
             .get_mut(repo)
             .expect("failed to get state value for repo")
@@ -597,7 +611,8 @@ impl<'a, W: Write> UI<'a, W> {
     /// Note that updates are queued, and are not reflected in the UI
     /// until the `update()` method is called.
     fn update_state(&mut self, repo: &'a Repo, remote: &str, state: State) {
-        self.updates.push((repo, remote.to_owned(), state));
+        self.updates
+            .push((repo, remote.to_owned(), state));
     }
 
     /// Instructs the user interface to update the terminal.
@@ -638,8 +653,10 @@ impl<'a, W: Write> UI<'a, W> {
     ///
     /// **This is an internal method and should not be called outside
     /// the impl.**
-    #[cfg_attr(feature = "cargo-clippy",
-               allow(cast_possible_truncation, many_single_char_names))]
+    #[cfg_attr(
+        feature = "cargo-clippy",
+        allow(cast_possible_truncation, many_single_char_names)
+    )]
     fn draw(&mut self, w: u16, h: u16, results: &Results) {
         // We do some calculations where we need width and height as a
         // usize, so we just assign them some variables.
@@ -843,8 +860,8 @@ impl<'a, W: Write> UI<'a, W> {
     /// the impl.**
     fn process_updates(&mut self, results: &Results) {
         for &(repo, ref remote, ref state) in &self.updates {
-            if let Some(&(x, y, ref s)) =
-                self.locations.get(&(repo, Some(remote.to_owned())))
+            if let Some(&(x, y, ref s)) = self.locations
+                .get(&(repo, Some(remote.to_owned())))
             {
                 let style = self.style_for_state(state);
                 write!(

@@ -60,7 +60,11 @@ pub fn run(invocation: &Invocation) {
     let mut cache: HashMap<&Repo, Summary> = HashMap::new();
     for (tag, repos) in invocation.iter_tags(TAG_ARG) {
         if let Some(tag) = tag {
-            println!("\n{}{}", header.paint("TAG:"), header.paint(tag));
+            println!(
+                "\n{}{}",
+                header.paint("TAG:"),
+                header.paint(tag)
+            );
         } else {
             println!();
         }
@@ -86,10 +90,16 @@ pub fn run(invocation: &Invocation) {
                         count: usize,
                         description: &str,
                     ) -> Note {
-                        let kind =
-                            if count > 0 { Kind::Failure } else { Kind::None };
-                        let files =
-                            if count == 1 { "file is" } else { "files are" };
+                        let kind = if count > 0 {
+                            Kind::Failure
+                        } else {
+                            Kind::None
+                        };
+                        let files = if count == 1 {
+                            "file is"
+                        } else {
+                            "files are"
+                        };
                         Note::new(
                             group,
                             kind,
@@ -168,7 +178,7 @@ pub fn run(invocation: &Invocation) {
                                     ),
                                 ));
                                 continue;
-                            }
+                            },
                         };
                         if ahead > 0 && behind > 0 {
                             summary.push_note(Note::new(
