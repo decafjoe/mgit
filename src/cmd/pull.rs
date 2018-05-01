@@ -641,7 +641,7 @@ impl<'a, W: Write> UI<'a, W> {
 
     /// Cleans up the UI and resets the terminal.
     fn cleanup(&mut self) {
-        write!(self.t, "{}{}\n", clear::All, cursor::Show)
+        writeln!(self.t, "{}{}", clear::All, cursor::Show)
             .expect("failed to write content to the terminal");
         self.t
             .flush()

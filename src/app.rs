@@ -500,7 +500,7 @@ impl<'a> Iter<'a> {
     /// Creates and returns a new `Iter` for `repos`.
     fn new(repos: Vec<&'a Repo>) -> Self {
         Self {
-            repos: repos,
+            repos,
             iter_field: Field::Name,
             sort_field: Field::Name,
             sorted: false,
@@ -536,7 +536,7 @@ impl<'a> Iter<'a> {
             }
         }
         Self {
-            repos: repos,
+            repos,
             iter_field: self.iter_field,
             sort_field: self.sort_field,
             sorted: self.sorted,
@@ -829,9 +829,7 @@ pub struct Control {
 impl Control {
     /// Creates and returns a new control instance.
     fn new(warning_action: Action) -> Self {
-        Self {
-            warning_action: warning_action,
-        }
+        Self { warning_action }
     }
 
     /// Prints error condition to stdout.
@@ -934,9 +932,9 @@ impl<'a> TagIter<'a> {
             Some(ref tags) => (0..tags.len()).collect(),
         };
         Self {
-            config: config,
-            tags: tags,
-            indices: indices,
+            config,
+            tags,
+            indices,
         }
     }
 }
@@ -993,9 +991,9 @@ impl<'a> Invocation<'a> {
         matches: &'a ArgMatches,
     ) -> Self {
         Self {
-            config: config,
-            control: control,
-            matches: matches,
+            config,
+            control,
+            matches,
         }
     }
 

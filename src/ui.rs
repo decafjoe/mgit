@@ -37,8 +37,8 @@ impl Note {
     /// Creates and returns a new `Note`.
     pub fn new(group: usize, kind: Kind, message: &str) -> Self {
         Self {
-            group: group,
-            kind: kind,
+            group,
+            kind,
             message: message.to_owned(),
         }
     }
@@ -82,8 +82,8 @@ impl<'a> Iter<'a> {
         let mut indices = (0..summary.notes().len()).collect::<Vec<usize>>();
         indices.sort_by_key(|i| (notes[*i].group(), notes[*i].message()));
         Self {
-            indices: indices,
-            summary: summary,
+            indices,
+            summary,
         }
     }
 }
@@ -173,7 +173,7 @@ impl<'a> TrackingBranch<'a> {
     /// Creates and returns a new `TrackingBranch` instance for local
     /// `branch`.
     fn new(branch: Branch<'a>) -> Self {
-        Self { branch: branch }
+        Self { branch }
     }
 
     /// Returns a reference to the local branch.
@@ -249,9 +249,7 @@ impl<'a> TrackingBranches<'a> {
     /// repository `git`.
     pub fn for_repository(git: &'a Repository) -> Result<Self, Vec<Error>> {
         match TrackingBranches::get(git) {
-            Ok(branches) => Ok(Self {
-                branches: branches,
-            }),
+            Ok(branches) => Ok(Self { branches }),
             Err(e) => Err(e),
         }
     }
