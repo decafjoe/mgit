@@ -43,21 +43,26 @@ mod ui;
 
 /// Entry point for the program.
 pub fn main() {
-    let matches = app::app()
-        .subcommand(cmd::config::subcommand())
-        .subcommand(cmd::pull::subcommand())
-        .subcommand(cmd::status::subcommand())
-        .get_matches();
-
-    let (control, config) = app::run(&matches);
-
-    if let Some(m) = matches.subcommand_matches(cmd::config::NAME) {
-        cmd::config::run(&app::Invocation::new(&control, &config, m));
-    } else if let Some(m) = matches.subcommand_matches(cmd::pull::NAME) {
-        cmd::pull::run(&app::Invocation::new(&control, &config, m));
-    } else if let Some(m) = matches.subcommand_matches(cmd::status::NAME) {
-        cmd::status::run(&app::Invocation::new(&control, &config, m));
-    } else {
-        control.fatal("no command supplied, see `mgit -h` for usage info");
-    }
+    let commands: Vec<app::Command> = vec![
+        app::Command::new(
+            cmd::config::NAME,
+            cmd::config::ABOUT,
+            cmd::config::args,
+            cmd::config::run,
+        ),
+        app::Command::new(
+            cmd::pull::NAME,
+            cmd::pull::ABOUT,
+            cmd::pull::args,
+            cmd::pull::run,
+        ),
+        app::Command::new(
+            cmd::status::NAME,
+            cmd::status::ABOUT,
+            cmd::status::args,
+            cmd::status::run,
+        ),
+    ];
+    let (invocation, command) = app::init(&commands);
+    command.run(&invocation);
 }

@@ -9,7 +9,7 @@ use std::{
 };
 
 use ansi_term::{Color, Style};
-use clap::{App, Arg, SubCommand};
+use clap::Arg;
 use crossbeam;
 use git2::{ObjectType, ResetType, StatusOptions, StatusShow};
 use termion::{
@@ -24,6 +24,9 @@ use ui::{Kind, Note, Summary, TrackingBranches};
 
 /// Name of the command (`pull`).
 pub const NAME: &str = "pull";
+/// One-line description of the command (`pull`).
+pub const ABOUT: &str =
+    "Fetches from remotes and fast-forwards local tracking branches if safe";
 
 /// Name of the argument for `-c/--concurrent`.
 const CONCURRENT_ARG: &str = "CONCURRENT";
@@ -55,25 +58,21 @@ const DEBOUNCE_MILLIS: u64 = 500;
 /// `Summary`.
 type Results<'a> = HashMap<&'a Repo, Summary>;
 
-/// Returns configured clap subcommand for `pull`.
-pub fn subcommand<'a>() -> App<'a, 'a> {
-    SubCommand::with_name(NAME)
-        .about("Fetches remotes and fast-forwards tracking branches if safe")
-        .arg(
-            Arg::with_name(CONCURRENT_ARG)
-                .default_value(CONCURRENT_DEFAULT)
-                .help("Number of concurrent fetches")
-                .short("c")
-                .long("concurrent"),
-        )
-        .arg(
-            Arg::with_name(TAG_ARG)
-                .help("Limits pull to repos with specified tag(s)")
-                .short("t")
-                .long("tag")
-                .multiple(true)
-                .number_of_values(1),
-        )
+/// Returns the arguments for the command.
+pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
+    vec![
+        Arg::with_name(CONCURRENT_ARG)
+            .default_value(CONCURRENT_DEFAULT)
+            .help("Number of concurrent fetches")
+            .short("c")
+            .long("concurrent"),
+        Arg::with_name(TAG_ARG)
+            .help("Limits pull to repos with specified tag(s)")
+            .short("t")
+            .long("tag")
+            .multiple(true)
+            .number_of_values(1),
+    ]
 }
 
 /// Executes the `pull` subcommand.
