@@ -11,24 +11,31 @@ use std::{
 };
 
 use ansi_term::{Color, Style};
-use clap::{App, Arg, ArgMatches};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use git2::Repository;
 use ini::Ini;
 use pager::Pager;
 use users::{self, os::unix::UserExt};
 use walkdir::WalkDir;
 
+/// Name of the program (`mgit`).
+const NAME: &str = "mgit";
+/// One-line description of the program.
+const ABOUT: &str = "Small program for managing multiple git repositories.";
+
 /// Name for the `-c/--config` argument.
 const CONFIG_ARG: &str = "CONFIG";
 /// Name for the `-W/--warning` argument.
 const WARNING_ARG: &str = "WARNING";
 
-/// Returns configured top-level clap `App` instance.
-pub fn app<'a>() -> App<'a, 'a> {
-    App::new("mgit")
+pub fn init<'a>(
+    commands: &'a [Command<'a>],
+) -> (Invocation<'a>, &'a Command<'a>) {
+    // Configure the top-level app instance.
+    let mut app = App::new(NAME)
         .version(crate_version!())
         .author(crate_authors!())
-        .about("Small program for managing multiple git repositories.")
+        .about(ABOUT)
         .arg(
             Arg::with_name(CONFIG_ARG)
                 .default_value("~/.mgit")
@@ -48,34 +55,43 @@ pub fn app<'a>() -> App<'a, 'a> {
                 .possible_values(&["ignore", "print", "fatal"])
                 .takes_value(true)
                 .value_name("ACTION"),
-        )
-}
+        );
 
-/// Runs the application with the specified `matches`, returning
-/// initialized state/control instances.
-pub fn run(matches: &ArgMatches) -> (Control, Config) {
-    // Pull out provided arguments. Per the configuration in `app()`,
-    // clap should make sure none of this ever actually panics.
-    let warning_action_value = matches
+    // Attach each of the subcommands and their arguments.
+    for command in commands {
+        let mut subcommand =
+            SubCommand::with_name(command.name).about(command.about);
+        for arg in &command.args {
+            subcommand = subcommand.arg(arg);
+        }
+        app = app.subcommand(subcommand);
+    }
+
+    // Parse the input from the user.
+    let matches = app.get_matches();
+
+    // Get the argument values.
+    let config_paths = matches
+        .values_of(CONFIG_ARG)
+        .expect("no value for config argument");
+    let warning_action = matches
         .value_of(WARNING_ARG)
         .expect("no value for warning action argument");
-    let warning_action = match warning_action_value {
+
+    // Control instance for the invocation.
+    let control = Control::new(match warning_action {
         "ignore" => Action::Ignore,
         "print" => Action::Print,
         "fatal" => Action::Fatal,
         &_ => panic!(
             "unexpected value for warning action ('{}')",
-            warning_action_value
+            warning_action
         ),
-    };
-    let config_paths = matches
-        .values_of(CONFIG_ARG)
-        .expect("no value for config argument");
+    });
 
     // Read the configuration from the provided `-c/--config` paths,
     // passing errors from the config reader to the control instance,
     // as warnings.
-    let control = Control::new(warning_action);
     let mut config = Config::new();
     for path in config_paths {
         for error in config.read(path) {
@@ -98,12 +114,53 @@ pub fn run(matches: &ArgMatches) -> (Control, Config) {
         }
     }
 
+    // Check that we actually got some repos. If not, something likely
+    // went seriously wrong somewhere. In any case, mgit can't do
+    // anything useful.
     if config.repos().len() == 0 {
         control.fatal("no repositories configured");
     }
 
-    // Return and transfer ownership of control and config instances.
-    (control, config)
+    // Determine which (if any) subcommand the user invoked, then
+    // return it and a newly-created invocation instance to the
+    // caller.
+    for command in commands {
+        if let Some(m) = matches.subcommand_matches(command.name) {
+            return (Invocation::new(control, config, m), command);
+        }
+    }
+
+    control.fatal("no command supplied, see `mgit -h` for usage info");
+    panic!("unreachable");
+}
+
+// ----- Command --------------------------------------------------------------
+
+pub struct Command<'a> {
+    name: &'a str,
+    about: &'a str,
+    args: Vec<Arg<'a, 'a>>,
+    run: fn(&Invocation),
+}
+
+impl<'a> Command<'a> {
+    pub fn new(
+        name: &'a str,
+        about: &'a str,
+        args: fn() -> Vec<Arg<'a, 'a>>,
+        run: fn(&Invocation),
+    ) -> Self {
+        Self {
+            name,
+            about,
+            args: args(),
+            run,
+        }
+    }
+
+    pub fn run(&self, invocation: &Invocation) {
+        (self.run)(invocation)
+    }
 }
 
 // ----- Error ----------------------------------------------------------------
@@ -976,35 +1033,35 @@ const PAGER: &str = "less -efFnrX";
 /// All state for a given invocation of the program.
 pub struct Invocation<'a> {
     /// `Config` instance.
-    config: &'a Config,
+    config: Config,
     /// `Control` instance.
-    control: &'a Control,
+    control: Control,
     /// `ArgMatches` instance, for the subcommand arguments.
-    matches: &'a ArgMatches<'a>,
+    matches: ArgMatches<'a>,
 }
 
 impl<'a> Invocation<'a> {
     /// Creates and returns a new invocation instance.
-    pub fn new(
-        control: &'a Control,
-        config: &'a Config,
-        matches: &'a ArgMatches,
+    fn new(
+        control: Control,
+        config: Config,
+        matches: &ArgMatches<'a>,
     ) -> Self {
         Self {
             config,
             control,
-            matches,
+            matches: matches.clone(),
         }
     }
 
     /// Returns the control struct for this invocation.
     pub fn control(&self) -> &Control {
-        self.control
+        &self.control
     }
 
     /// Returns the matches struct for this invocation.
     pub fn matches(&self) -> &ArgMatches {
-        self.matches
+        &self.matches
     }
 
     /// Returns a `TagIter` based on the end-user arguments supplied
@@ -1016,7 +1073,7 @@ impl<'a> Invocation<'a> {
             Some(tags) => Some(tags.collect()),
             None => None,
         };
-        TagIter::new(self.config, tags)
+        TagIter::new(&self.config, tags)
     }
 
     /// Starts the pager with mgit's "standard" arguments.

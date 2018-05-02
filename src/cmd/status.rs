@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 
 use ansi_term::{Color, Style};
-use clap::{App, Arg, SubCommand};
+use clap::Arg;
 use git2::{Status, StatusOptions, StatusShow};
 
 use app::{Invocation, Repo};
@@ -10,6 +10,8 @@ use ui::{Kind, Note, Summary, TrackingBranches};
 
 /// Name of the command (`status`).
 pub const NAME: &str = "status";
+/// One-line description of the command (`status`).
+pub const ABOUT: &str = "Prints current status of repositories";
 
 /// Name of the argument for `-t/--tag`.
 const TAG_ARG: &str = "TAG";
@@ -31,24 +33,20 @@ const STATUS_UNTRACKED_GROUP: usize = 12;
 /// Group number for branch status messages.
 const BRANCH_STATUS_GROUP: usize = 110;
 
-/// Returns configured clap subcommand for `status`.
-pub fn subcommand<'a>() -> App<'a, 'a> {
-    SubCommand::with_name(NAME)
-        .about("Prints current status of repositories")
-        .arg(
-            Arg::with_name(TAG_ARG)
-                .help("Limits/groups display to repos with specified tag(s)")
-                .short("t")
-                .long("tag")
-                .multiple(true)
-                .number_of_values(1),
-        )
-        .arg(
-            Arg::with_name(VERBOSE_ARG)
-                .help("Shows defaults in addition to user-specified config")
-                .short("v")
-                .long("verbose"),
-        )
+/// Returns the arguments for the command.
+pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
+    vec![
+        Arg::with_name(TAG_ARG)
+            .help("Limits/groups display to repos with specified tag(s)")
+            .short("t")
+            .long("tag")
+            .multiple(true)
+            .number_of_values(1),
+        Arg::with_name(VERBOSE_ARG)
+            .help("Shows defaults in addition to user-specified config")
+            .short("v")
+            .long("verbose"),
+    ]
 }
 
 /// Executes the `status` subcommand.
