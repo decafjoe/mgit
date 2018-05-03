@@ -8,7 +8,6 @@ use std::{
     io::Read,
     iter::Iterator,
     path::{Path, PathBuf, MAIN_SEPARATOR},
-    process,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -39,6 +38,7 @@ const WARNING_ARG: &str = "WARNING";
 /// a reference to the subcommand that was invoked by the user.
 pub fn init<'a>(
     _: Sender<()>,
+    exit: fn(i32),
     terminate: Arc<AtomicBool>,
     commands: &'a [Command<'a>],
 ) -> Invocation<'a> {
@@ -89,12 +89,15 @@ pub fn init<'a>(
         .expect("no value for warning action argument");
 
     // Control instance for the invocation.
-    let control = Control::new(match warning_action {
-        "ignore" => Action::Ignore,
-        "print" => Action::Print,
-        "fatal" => Action::Fatal,
-        &_ => panic!("unexpected value for warning action ('{}')", warning_action),
-    });
+    let control = Control::new(
+        exit,
+        match warning_action {
+            "ignore" => Action::Ignore,
+            "print" => Action::Print,
+            "fatal" => Action::Fatal,
+            &_ => panic!("unexpected value for warning action ('{}')", warning_action),
+        },
+    );
 
     // Read the configuration from the provided `-c/--config` paths, passing errors
     // from the config reader to the control instance, as warnings.
@@ -856,14 +859,19 @@ enum Action {
 
 /// High level program control – warnings and fatal errors.
 pub struct Control {
+    /// Function to call on exit.
+    exit: fn(i32),
     /// Action to take on warnings.
     warning_action: Action,
 }
 
 impl Control {
     /// Creates and returns a new control instance.
-    fn new(warning_action: Action) -> Self {
-        Self { warning_action }
+    fn new(exit: fn(i32), warning_action: Action) -> Self {
+        Self {
+            exit,
+            warning_action,
+        }
     }
 
     /// Prints error condition to stdout.
@@ -910,7 +918,7 @@ impl Control {
     /// `1`.
     pub fn fatal(&self, message: &str) {
         self.print("  fatal", Color::Red, message);
-        process::exit(1);
+        (self.exit)(1)
     }
 }
 

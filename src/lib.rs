@@ -76,6 +76,10 @@ static COMMANDS: [Command; 3] = [
     },
 ];
 
+fn exit(code: i32) {
+    process::exit(code);
+}
+
 /// Entry point for the program.
 pub fn main() {
     // Channel to listen to for termination signals.
@@ -91,12 +95,12 @@ pub fn main() {
     // Initialize the application, allowing a term signal to immediately exit the
     // process.
     let (init_done_tx, init_done) = chan::sync(0);
-    let init_guard = thread::spawn(move || init(init_done_tx, init_terminate_arc, &COMMANDS));
+    let init_guard = thread::spawn(move || init(init_done_tx, exit, init_terminate_arc, &COMMANDS));
     chan_select! {
         init_done.recv() => {},
         terminate_signal.recv() -> _ => {
             eprintln!();
-            process::exit(1);
+            exit(1);
         },
     }
 
@@ -115,7 +119,7 @@ pub fn main() {
     // method. When the flag is set, the subcommand should clean up and exit as
     // soon as it can.
     chan_select! {
-        run_done.recv() => { return; },
+        run_done.recv() => { exit(0); },
         terminate_signal.recv() -> _ => {
             terminate_arc.store(true, Ordering::Relaxed);
         },
@@ -127,5 +131,5 @@ pub fn main() {
         run_done.recv() => {},
         terminate_signal.recv() => { eprintln!(); },
     }
-    process::exit(1);
+    exit(1);
 }
