@@ -24,6 +24,9 @@
 //! critical.)
 extern crate ansi_term;
 #[macro_use]
+extern crate chan;
+extern crate chan_signal;
+#[macro_use]
 extern crate clap;
 extern crate crossbeam;
 extern crate git2;
@@ -38,28 +41,91 @@ mod app;
 mod cmd;
 mod ui;
 
+use std::{
+    process,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+};
+
+use chan_signal::Signal;
+
+use app::{init, Command};
+use cmd::{config, pull, status};
+
+static COMMANDS: [Command; 3] = [
+    Command {
+        name: config::NAME,
+        about: config::ABOUT,
+        args: config::args,
+        run: config::run,
+    },
+    Command {
+        name: pull::NAME,
+        about: pull::ABOUT,
+        args: pull::args,
+        run: pull::run,
+    },
+    Command {
+        name: status::NAME,
+        about: status::ABOUT,
+        args: status::args,
+        run: status::run,
+    },
+];
+
 /// Entry point for the program.
 pub fn main() {
-    let commands: Vec<app::Command> = vec![
-        app::Command::new(
-            cmd::config::NAME,
-            cmd::config::ABOUT,
-            cmd::config::args,
-            cmd::config::run,
-        ),
-        app::Command::new(
-            cmd::pull::NAME,
-            cmd::pull::ABOUT,
-            cmd::pull::args,
-            cmd::pull::run,
-        ),
-        app::Command::new(
-            cmd::status::NAME,
-            cmd::status::ABOUT,
-            cmd::status::args,
-            cmd::status::run,
-        ),
-    ];
-    let (invocation, command) = app::init(&commands);
-    command.run(&invocation);
+    // Channel to listen to for termination signals.
+    let terminate_signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
+
+    // Two copies of the refcell that hold the "received terminate signal" state.
+    // One copy for the invocation instance, which is moved to a separate thread,
+    // and one for the main thread, which uses it to pass the signal through the
+    // invocation to the subcommand thread.
+    let terminate_arc = Arc::new(AtomicBool::new(false));
+    let init_terminate_arc = Arc::clone(&terminate_arc);
+
+    // Initialize the application, allowing a term signal to immediately exit the
+    // process.
+    let (init_done_tx, init_done) = chan::sync(0);
+    let init_guard = thread::spawn(move || init(init_done_tx, init_terminate_arc, &COMMANDS));
+    chan_select! {
+        init_done.recv() => {},
+        terminate_signal.recv() -> _ => {
+            eprintln!();
+            process::exit(1);
+        },
+    }
+
+    // Unwrap the invocation value returned by the init thread.
+    let invocation = init_guard
+        .join()
+        .expect("failed to get results from init function");
+
+    // Run the subcommand in a separate thread, keeping the main thread free to
+    // listen for terminate signals.
+    let (run_done_tx, run_done) = chan::sync(0);
+    thread::spawn(move || invocation.command().run(run_done_tx, &invocation));
+
+    // If we get a terminate signal, set the "should terminate" flag. The
+    // subcommand can check this via the `Invocation.should_terminate()`
+    // method. When the flag is set, the subcommand should clean up and exit as
+    // soon as it can.
+    chan_select! {
+        run_done.recv() => { return; },
+        terminate_signal.recv() -> _ => {
+            terminate_arc.store(true, Ordering::Relaxed);
+        },
+    }
+
+    // If we get a second terminate signal before the command has cleaned up and
+    // exited, hard bail out of the process.
+    chan_select! {
+        run_done.recv() => {},
+        terminate_signal.recv() => { eprintln!(); },
+    }
+    process::exit(1);
 }

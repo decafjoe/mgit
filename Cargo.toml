@@ -5,6 +5,8 @@ authors = ["Joe Joyce <joe@decafjoe.com>"]
 
 [dependencies]
 ansi_term = "~0.11.0"
+chan = "~0.1.21"
+chan-signal = "~0.3.1"
 clap = { version = "~2.31.2", features = ["wrap_help"] }
 crossbeam = "~0.3.2"
 indexmap = "~1.0.1"
