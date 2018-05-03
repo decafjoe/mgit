@@ -58,11 +58,7 @@ pub fn run(invocation: &Invocation) {
     let mut cache: HashMap<&Repo, Summary> = HashMap::new();
     for (tag, repos) in invocation.iter_tags(TAG_ARG) {
         if let Some(tag) = tag {
-            println!(
-                "\n{}{}",
-                header.paint("TAG:"),
-                header.paint(tag)
-            );
+            println!("\n{}{}", header.paint("TAG:"), header.paint(tag));
         } else {
             println!();
         }
@@ -83,34 +79,17 @@ pub fn run(invocation: &Invocation) {
                 if let Ok(statuses) = git.statuses(Some(&mut status_options)) {
                     /// Returns a new `Note` for the given status
                     /// result.
-                    fn note_for_status(
-                        group: usize,
-                        count: usize,
-                        description: &str,
-                    ) -> Note {
-                        let kind = if count > 0 {
-                            Kind::Failure
-                        } else {
-                            Kind::None
-                        };
-                        let files = if count == 1 {
-                            "file is"
-                        } else {
-                            "files are"
-                        };
-                        Note::new(
-                            group,
-                            kind,
-                            &format!("{} {} {}", count, files, description),
-                        )
+                    fn note_for_status(group: usize, count: usize, description: &str) -> Note {
+                        let kind = if count > 0 { Kind::Failure } else { Kind::None };
+                        let files = if count == 1 { "file is" } else { "files are" };
+                        Note::new(group, kind, &format!("{} {} {}", count, files, description))
                     }
 
                     let indexed = statuses
                         .iter()
                         .filter(|status_entry| {
                             status_entry.status().intersects(
-                                Status::INDEX_DELETED | Status::INDEX_MODIFIED
-                                    | Status::INDEX_NEW
+                                Status::INDEX_DELETED | Status::INDEX_MODIFIED | Status::INDEX_NEW
                                     | Status::INDEX_RENAMED
                                     | Status::INDEX_TYPECHANGE,
                             )
@@ -125,22 +104,15 @@ pub fn run(invocation: &Invocation) {
                         .iter()
                         .filter(|status_entry| {
                             status_entry.status().intersects(
-                                Status::WT_DELETED | Status::WT_MODIFIED
-                                    | Status::WT_RENAMED
+                                Status::WT_DELETED | Status::WT_MODIFIED | Status::WT_RENAMED
                                     | Status::WT_TYPECHANGE,
                             )
                         })
                         .count();
-                    summary.push_note(note_for_status(
-                        STATUS_MODIFIED_GROUP,
-                        modified,
-                        "modified",
-                    ));
+                    summary.push_note(note_for_status(STATUS_MODIFIED_GROUP, modified, "modified"));
                     let untracked = statuses
                         .iter()
-                        .filter(|status_entry| {
-                            status_entry.status().intersects(Status::WT_NEW)
-                        })
+                        .filter(|status_entry| status_entry.status().intersects(Status::WT_NEW))
                         .count();
                     summary.push_note(note_for_status(
                         STATUS_UNTRACKED_GROUP,
@@ -159,32 +131,29 @@ pub fn run(invocation: &Invocation) {
                     Ok(branches) => for branch in branches {
                         let local_name = branch.local_name();
                         let upstream_name = branch.upstream_name();
-                        let (ahead, behind) = match git.graph_ahead_behind(
-                            branch.local_oid(),
-                            branch.upstream_oid(),
-                        ) {
-                            Ok((ahead, behind)) => (ahead, behind),
-                            Err(e) => {
-                                summary.push_note(Note::new(
-                                    BRANCH_FAILURE_GROUP,
-                                    Kind::Failure,
-                                    &format!(
-                                        "failed to determine relationship \
-                                         between local branch {} and \
-                                         upstream branch {} ({})",
-                                        local_name, upstream_name, e,
-                                    ),
-                                ));
-                                continue;
-                            },
-                        };
+                        let (ahead, behind) =
+                            match git.graph_ahead_behind(branch.local_oid(), branch.upstream_oid())
+                            {
+                                Ok((ahead, behind)) => (ahead, behind),
+                                Err(e) => {
+                                    summary.push_note(Note::new(
+                                        BRANCH_FAILURE_GROUP,
+                                        Kind::Failure,
+                                        &format!(
+                                            "failed to determine relationship between local \
+                                             branch {} and upstream branch {} ({})",
+                                            local_name, upstream_name, e,
+                                        ),
+                                    ));
+                                    continue;
+                                },
+                            };
                         if ahead > 0 && behind > 0 {
                             summary.push_note(Note::new(
                                 BRANCH_STATUS_GROUP,
                                 Kind::Failure,
                                 &format!(
-                                    "{} has diverged from {} ({} and {} \
-                                     commits)",
+                                    "{} has diverged from {} ({} and {} commits)",
                                     local_name, upstream_name, ahead, behind
                                 ),
                             ));
@@ -212,10 +181,7 @@ pub fn run(invocation: &Invocation) {
                             summary.push_note(Note::new(
                                 BRANCH_STATUS_GROUP,
                                 Kind::None,
-                                &format!(
-                                    "{} is up to date with {}",
-                                    local_name, upstream_name
-                                ),
+                                &format!("{} is up to date with {}", local_name, upstream_name),
                             ));
                         }
                     },
@@ -254,15 +220,10 @@ pub fn run(invocation: &Invocation) {
                 let style = match (verbose, note.kind()) {
                     (true, &Kind::Warning) => Color::Yellow.normal(),
                     (true, &Kind::Failure) => Color::Red.normal(),
-                    (false, _)
-                    | (true, &Kind::None)
-                    | (true, &Kind::Success) => Style::new(),
+                    (false, _) | (true, &Kind::None) | (true, &Kind::Success) => Style::new(),
                 };
                 if verbose || *note.kind() != Kind::None {
-                    println!(
-                        "{}",
-                        style.paint(format!("  \u{2192} {}", note.message()))
-                    )
+                    println!("{}", style.paint(format!("  \u{2192} {}", note.message())))
                 }
             }
         }
