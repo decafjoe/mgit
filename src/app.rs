@@ -28,9 +28,10 @@ const CONFIG_ARG: &str = "CONFIG";
 /// Name for the `-W/--warning` argument.
 const WARNING_ARG: &str = "WARNING";
 
-pub fn init<'a>(
-    commands: &'a [Command<'a>],
-) -> (Invocation<'a>, &'a Command<'a>) {
+/// Initializes the application, attaches subcommands, parses user input, reads
+/// configuration, populates the invocation instance and returns it along with
+/// a reference to the subcommand that was invoked by the user.
+pub fn init<'a>(commands: &'a [Command<'a>]) -> (Invocation<'a>, &'a Command<'a>) {
     // Configure the top-level app instance.
     let mut app = App::new(NAME)
         .version(crate_version!())
@@ -59,8 +60,7 @@ pub fn init<'a>(
 
     // Attach each of the subcommands and their arguments.
     for command in commands {
-        let mut subcommand =
-            SubCommand::with_name(command.name).about(command.about);
+        let mut subcommand = SubCommand::with_name(command.name).about(command.about);
         for arg in &command.args {
             subcommand = subcommand.arg(arg);
         }
@@ -83,20 +83,15 @@ pub fn init<'a>(
         "ignore" => Action::Ignore,
         "print" => Action::Print,
         "fatal" => Action::Fatal,
-        &_ => panic!(
-            "unexpected value for warning action ('{}')",
-            warning_action
-        ),
+        &_ => panic!("unexpected value for warning action ('{}')", warning_action),
     });
 
-    // Read the configuration from the provided `-c/--config` paths,
-    // passing errors from the config reader to the control instance,
-    // as warnings.
+    // Read the configuration from the provided `-c/--config` paths, passing errors
+    // from the config reader to the control instance, as warnings.
     let mut config = Config::new();
     for path in config_paths {
         for error in config.read(path) {
-            let mut s =
-                format!("{}", Style::new().bold().paint(error.message()));
+            let mut s = format!("{}", Style::new().bold().paint(error.message()));
             if let Some(cause) = error.cause() {
                 s.push_str(&format!("\n{}", cause));
             }
@@ -114,16 +109,14 @@ pub fn init<'a>(
         }
     }
 
-    // Check that we actually got some repos. If not, something likely
-    // went seriously wrong somewhere. In any case, mgit can't do
-    // anything useful.
+    // Check that we actually got some repos. If not, something likely went
+    // seriously wrong somewhere. In any case, mgit can't do anything useful.
     if config.repos().len() == 0 {
         control.fatal("no repositories configured");
     }
 
-    // Determine which (if any) subcommand the user invoked, then
-    // return it and a newly-created invocation instance to the
-    // caller.
+    // Determine which (if any) subcommand the user invoked, then return it and a
+    // newly-created invocation instance to the caller.
     for command in commands {
         if let Some(m) = matches.subcommand_matches(command.name) {
             return (Invocation::new(control, config, m), command);
@@ -134,16 +127,25 @@ pub fn init<'a>(
     panic!("unreachable");
 }
 
-// ----- Command --------------------------------------------------------------
+// ----- Command ------------------------------------------------------------------------------------------------------
 
+/// Convenience wrapper around the configuration that makes up a "command."
 pub struct Command<'a> {
+    /// Name of the command.
     name: &'a str,
+    /// Short one-line description of the command.
     about: &'a str,
+    /// Vec of clap arguments for the command.
     args: Vec<Arg<'a, 'a>>,
+    /// Reference to function to invoke when command is called.
     run: fn(&Invocation),
 }
 
 impl<'a> Command<'a> {
+    /// Create and return a new `Command` instance.
+    ///
+    /// Note that the `args` argument will be called in order to populate the
+    /// `args` member.
     pub fn new(
         name: &'a str,
         about: &'a str,
@@ -158,12 +160,13 @@ impl<'a> Command<'a> {
         }
     }
 
+    /// Invoke the function that "runs" the subcommand.
     pub fn run(&self, invocation: &Invocation) {
         (self.run)(invocation)
     }
 }
 
-// ----- Error ----------------------------------------------------------------
+// ----- Error --------------------------------------------------------------------------------------------------------
 
 /// Represents a basic error.
 pub struct Error {
@@ -185,28 +188,25 @@ impl Error {
     }
 }
 
-// ----- resolve_path ---------------------------------------------------------
+// ----- resolve_path -------------------------------------------------------------------------------------------------
 
 /// Resolves the given `path`.
 ///
-/// If the path starts with `~`, this tries to resolve it to a user
-/// home directory (or a subdirectory thereof).
+/// If the path starts with `~`, this tries to resolve it to a user home
+/// directory (or a subdirectory thereof).
 ///
-/// If the path starts with the system `MAIN_SEPARATOR`, it's assumed
-/// to be absolute and is left unchanged.
+/// If the path starts with the system `MAIN_SEPARATOR`, it's assumed to be
+/// absolute and is left unchanged.
 ///
-/// Otherwise, the path is assumed to be relative to `rel`. If `rel`
-/// does not have a value (i.e. is `None`) then the current working
-/// directory is used.
+/// Otherwise, the path is assumed to be relative to `rel`. If `rel` does not have a value (i.e. is `None`) then the current working directory is used.
 ///
-/// Once the path has been resolved per the above, it is canonicalized
-/// using `std::fs::canonicalize` and finally returned.
+/// Once the path has been resolved per the above, it is canonicalized using
+/// `std::fs::canonicalize` and finally returned.
 fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
     let mut relative_to = match rel {
         Some(path) => {
-            // Caller passed relative_to. If a directory, return
-            // as-is. Otherwise, figure out the directory containing
-            // the path and return that.
+            // Caller passed relative_to. If a directory, return as-is. Otherwise, figure
+            // out the directory containing the path and return that.
             let buf = PathBuf::from(path);
             if buf.is_dir() {
                 buf
@@ -224,22 +224,13 @@ fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
         },
         None => match env::current_dir() {
             Ok(buf) => buf,
-            Err(e) => {
-                return Err(Error::new(&format!(
-                    "could not get cwd ({})",
-                    e
-                )))
-            },
+            Err(e) => return Err(Error::new(&format!("could not get cwd ({})", e))),
         },
     };
     let path = if path.starts_with('~') {
-        // Check for `~` or `~/...` -- i.e. a bare tilde, meaning the
-        // current user.
+        // Check for `~` or `~/...` -- i.e. a bare tilde, meaning the current user.
         if path.len() == 1
-            || path.chars()
-                .nth(1)
-                .expect("could not get second char")
-                == MAIN_SEPARATOR
+            || path.chars().nth(1).expect("could not get second char") == MAIN_SEPARATOR
         {
             let uid = users::get_current_uid();
             if let Some(user) = users::get_user_by_uid(uid) {
@@ -255,14 +246,12 @@ fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
                 )));
             }
         } else {
-            // Fully specified user (e.g. `~foo/...`) -- extract
-            // username and look up home directory.
-            let name = path[1..].split(MAIN_SEPARATOR).nth(0).expect(
-                &format!(
-                    "splitting '{}' on MAIN_SEPARATOR ('{}') failed",
-                    path, MAIN_SEPARATOR
-                ),
-            );
+            // Fully specified user (e.g. `~foo/...`) -- extract username and look up home
+            // directory.
+            let name = path[1..].split(MAIN_SEPARATOR).nth(0).expect(&format!(
+                "splitting '{}' on MAIN_SEPARATOR ('{}') failed",
+                path, MAIN_SEPARATOR
+            ));
             if let Some(user) = users::get_user_by_name(name) {
                 let mut buf = user.home_dir().to_path_buf();
                 if path.len() > name.len() + 1 {
@@ -284,14 +273,11 @@ fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
     };
     match path.canonicalize() {
         Ok(path) => Ok(path),
-        Err(e) => Err(Error::new(&format!(
-            "failed to canonicalize path ({})",
-            e
-        ))),
+        Err(e) => Err(Error::new(&format!("failed to canonicalize path ({})", e))),
     }
 }
 
-// ----- ConfigError ----------------------------------------------------------
+// ----- ConfigError --------------------------------------------------------------------------------------------------
 
 /// Represents an error encountered when reading configuration.
 struct ConfigError {
@@ -307,12 +293,7 @@ struct ConfigError {
 
 impl ConfigError {
     /// Creates and returns a new `ConfigError` instance.
-    fn new(
-        config_path: &str,
-        repo_path: Option<&str>,
-        message: &str,
-        cause: Option<&str>,
-    ) -> Self {
+    fn new(config_path: &str, repo_path: Option<&str>, message: &str, cause: Option<&str>) -> Self {
         Self {
             config_path: config_path.to_owned(),
             repo_path: if let Some(path) = repo_path {
@@ -348,8 +329,8 @@ impl ConfigError {
         &self.message
     }
 
-    /// Returns the path of the associated repository, if relevant for
-    /// this error.
+    /// Returns the path of the associated repository, if relevant for this
+    /// error.
     fn repo_path(&self) -> Option<&str> {
         if let Some(ref path) = self.repo_path {
             Some(path)
@@ -359,7 +340,7 @@ impl ConfigError {
     }
 }
 
-// ----- Repo -----------------------------------------------------------------
+// ----- Repo ---------------------------------------------------------------------------------------------------------
 
 /// Symbol to use if not configured by end user.
 const DEFAULT_SYMBOL: &str = "\u{2022}";
@@ -374,8 +355,8 @@ pub struct Repo {
     full_path: String,
     /// Optional human-friendly name for the repo.
     name: Option<String>,
-    /// Optional "symbol" for the repo – the character that precedes
-    /// the repo name in status listings.
+    /// Optional "symbol" for the repo – the character that precedes the repo
+    /// name in status listings.
     symbol: Option<String>,
     /// Optional tags associated with the repo.
     tags: Vec<String>,
@@ -407,8 +388,7 @@ impl Repo {
         }
     }
 
-    /// Returns path of configuration file in which this repo was
-    /// defined.
+    /// Returns path of configuration file in which this repo was defined.
     pub fn config_path(&self) -> &str {
         &self.config_path
     }
@@ -449,8 +429,8 @@ impl Repo {
             .collect::<Vec<&str>>()
     }
 
-    /// Returns `name` if set, otherwise the default value as computed
-    /// from the `path`.
+    /// Returns `name` if set, otherwise the default value as computed from the
+    /// `path`.
     pub fn name_or_default(&self) -> &str {
         if let Some(ref name) = self.name {
             name
@@ -465,8 +445,7 @@ impl Repo {
         }
     }
 
-    /// Returns `symbol` if set, otherwise the value of
-    /// `DEFAULT_SYMBOL`.
+    /// Returns `symbol` if set, otherwise the value of `DEFAULT_SYMBOL`.
     pub fn symbol_or_default(&self) -> &str {
         if let Some(ref symbol) = self.symbol {
             symbol
@@ -487,9 +466,8 @@ impl Repo {
 impl PartialEq for Repo {
     /// Checks equality by comparing user-specified paths.
     ///
-    /// When obtained via the `Config` instance (the only "supported"
-    /// way to use `Repo` instances), paths are guaranteed to be
-    /// unique.
+    /// When obtained via the `Config` instance (the only "supported" way to
+    /// use `Repo` instances), paths are guaranteed to be unique.
     fn eq(&self, other: &Self) -> bool {
         self.path == other.path()
     }
@@ -506,10 +484,10 @@ impl Hash for Repo {
     }
 }
 
-// ----- Field ----------------------------------------------------------------
+// ----- Field --------------------------------------------------------------------------------------------------------
 
-/// `Repo` field, used to specify what to sort by or iterate through
-/// with `Iter`.
+/// `Repo` field, used to specify what to sort by or iterate through with
+/// `Iter`.
 pub enum Field {
     /// `Repo.path()`
     Path,
@@ -517,13 +495,13 @@ pub enum Field {
     Name,
 }
 
-// ----- Iter -----------------------------------------------------------------
+// ----- Iter ---------------------------------------------------------------------------------------------------------
 
 /// Iterator over a sorted vec of `Repo` instances.
 ///
-/// `Iter` is meant to be "set up" using chained method calls,
-/// transferring ownership through each call. The `Iter` instance
-/// itself is obtained from `Config.repos()`.
+/// `Iter` is meant to be "set up" using chained method calls, transferring
+/// ownership through each call. The `Iter` instance itself is obtained from
+/// `Config.repos()`.
 ///
 /// ```rust,ignore
 /// for (path, repo) in config
@@ -539,11 +517,11 @@ pub enum Field {
 /// }
 /// ```
 ///
-/// The underlying vector is not actually sorted until the first item
-/// is consumed.
+/// The underlying vector is not actually sorted until the first item is
+/// consumed.
 pub struct Iter<'a> {
-    /// `Vec` of `Repo` references to iterate through. Items are
-    /// popped off the front of this vec as the iterator is consumed.
+    /// `Vec` of `Repo` references to iterate through. Items are popped off the
+    /// front of this vec as the iterator is consumed.
     repos: Vec<&'a Repo>,
     /// `Field` to yield as the "key."
     iter_field: Field,
@@ -611,9 +589,9 @@ impl<'a> Iterator for Iter<'a> {
 
     /// Returns the next item in the iterator.
     ///
-    /// If this is the first item, the underlying vector is sorted.
-    /// The "key" yielded depends on the value of `iter_field`. The
-    /// value is always a reference to a `Repo`.
+    /// If this is the first item, the underlying vector is sorted. The "key"
+    /// yielded depends on the value of `iter_field`. The value is always a
+    /// reference to a `Repo`.
     fn next(&mut self) -> Option<Self::Item> {
         if !self.sorted {
             let field = &self.sort_field;
@@ -636,7 +614,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-// ----- Config ---------------------------------------------------------------
+// ----- Config -------------------------------------------------------------------------------------------------------
 
 /// Configuration key that specifies repo name.
 const NAME_KEY: &str = "name";
@@ -654,36 +632,30 @@ pub struct Config {
 impl Config {
     /// Creates and returns a new, empty `Config` instance.
     fn new() -> Self {
-        Self {
-            repos: Vec::new(),
-        }
+        Self { repos: Vec::new() }
     }
 
-    /// Returns an `Iter` instance over the repos in the
-    /// configuration.
+    /// Returns an `Iter` instance over the repos in the configuration.
     fn repos(&self) -> Iter {
         Iter::new(self.repos.iter().collect::<Vec<&Repo>>())
     }
 
-    /// Reads configuration at `path`, returning a list of errors
-    /// encountered.
+    /// Reads configuration at `path`, returning a list of errors encountered.
     ///
-    /// If `path` is a directory, it is recursively walked and any
-    /// files with the extension `.conf` are read into the
-    /// configuration.
+    /// If `path` is a directory, it is recursively walked and any files with
+    /// the extension `.conf` are read into the configuration.
     ///
     /// # Notes
     ///
-    /// This is the method that contains all the up-front validation
-    /// referenced in the module-level docs. It's very picky.
+    /// This is the method that contains all the up-front validation referenced
+    /// in the module-level docs. It's very picky.
     ///
-    /// If there are any errors reading `path` or its children (e.g.
-    /// `path` does not exist, permissions issues) those are returned.
+    /// If there are any errors reading `path` or its children (e.g. `path`
+    /// does not exist, permissions issues) those are returned.
     ///
-    /// This will also return errors with the configuration itself
-    /// (e.g. a file defines a repository that has already been
-    /// configured, repository path does not exist or is not a git
-    /// repo).
+    /// This will also return errors with the configuration itself (e.g. a file
+    /// defines a repository that has already been configured, repository path
+    /// does not exist or is not a git repo).
     fn read(&mut self, path: &str) -> Vec<ConfigError> {
         let path_str = path;
         let path = match resolve_path(path, None) {
@@ -735,10 +707,7 @@ impl Config {
 
         let mut full_paths = HashMap::new();
         for repo in &self.repos {
-            full_paths.insert(
-                repo.full_path().to_owned(),
-                repo.config_path().to_owned(),
-            );
+            full_paths.insert(repo.full_path().to_owned(), repo.config_path().to_owned());
         }
 
         for path in paths {
@@ -852,8 +821,7 @@ impl Config {
                     },
                     tags.as_slice(),
                 );
-                full_paths
-                    .insert(full_path_str.to_owned(), path_str.to_owned());
+                full_paths.insert(full_path_str.to_owned(), path_str.to_owned());
                 self.repos.push(repo);
             }
         }
@@ -862,7 +830,7 @@ impl Config {
     }
 }
 
-// ----- Action ---------------------------------------------------------------
+// ----- Action -------------------------------------------------------------------------------------------------------
 
 /// Represents an action to take in response to an error condition.
 #[derive(PartialEq)]
@@ -875,7 +843,7 @@ enum Action {
     Fatal,
 }
 
-// ----- Control --------------------------------------------------------------
+// ----- Control ------------------------------------------------------------------------------------------------------
 
 /// High level program control – warnings and fatal errors.
 pub struct Control {
@@ -891,15 +859,15 @@ impl Control {
 
     /// Prints error condition to stdout.
     ///
-    /// `label` indicates the type of the condition, `"warning"` or
-    /// `"  fatal"` (the labels are "manually" aligned).
+    /// `label` indicates the type of the condition, `"warning"` or `"  fatal"`
+    /// (the labels are "manually" aligned).
     ///
     /// `color` indicates the color for the `label`. The color will be
     /// `bold()`-ed.
     ///
-    /// `message` is the message to print to stderr. If the message
-    /// contains multiple lines, lines subsequent to the first are
-    /// indented to `label.len()` plus one.
+    /// `message` is the message to print to stderr. If the message contains
+    /// multiple lines, lines subsequent to the first are indented to
+    /// `label.len()` plus one.
     fn print(&self, label: &str, color: Color, message: &str) {
         let mut empty = String::from("");
         for _ in 0..label.len() {
@@ -913,14 +881,13 @@ impl Control {
 
     /// Registers a warning with the specified `message`.
     ///
-    /// The action taken depends on the `warning_action` supplied to
-    /// the constructor:
+    /// The action taken depends on the `warning_action` supplied to the
+    /// constructor:
     ///
     /// * If `Ignore`, nothing is done.
     /// * If `Print`, `message` is printed to stderr.
-    /// * If `Fatal`, `message` is printed to stderr, then `fatal()`
-    ///   is called with an error message noting that warnings are
-    ///   fatal.
+    /// * If `Fatal`, `message` is printed to stderr, then `fatal()` is called
+    /// with an error message noting that warnings are fatal.
     pub fn warning(&self, message: &str) {
         if self.warning_action != Action::Ignore {
             self.print("warning", Color::Yellow, message);
@@ -930,22 +897,19 @@ impl Control {
         }
     }
 
-    /// Prints `message` to stderr, then exits the process with an
-    /// exit code of `1`.
+    /// Prints `message` to stderr, then exits the process with an exit code of
+    /// `1`.
     pub fn fatal(&self, message: &str) {
         self.print("  fatal", Color::Red, message);
         process::exit(1);
     }
 }
 
-// ----- TagIter --------------------------------------------------------------
+// ----- TagIter ------------------------------------------------------------------------------------------------------
 
 /// Weird, kind of hacky iterator to support a common UI pattern.
 ///
-/// Let me explain. All the subcommands take (zero or more) `-t/--tag`
-/// arguments. This struct works in conjunction with
-/// `Invocation.iter_tags()` to let calling code handle those
-/// arguments without doing a bunch of legwork.
+/// Let me explain. All the subcommands take (zero or more) `-t/--tag` arguments. This struct works in conjunction with `Invocation.iter_tags()` to let calling code handle those arguments without doing a bunch of legwork.
 ///
 /// ```rust,ignore
 /// for (tag, repos) in invocation.iter_tags(TAG_ARG) {
@@ -957,27 +921,25 @@ impl Control {
 ///
 /// * The user supplied no `-t` arguments
 /// * `repos` is an `Iter` over all the configured repos
-/// * There will be exactly one item (this one) yielded from the
-///   `TagIter`
+/// * There will be exactly one item (this one) yielded from the `TagIter`
 ///
 /// Otherwise, `tag` will be `Some(&str)`, meaning:
 ///
 /// * The user supplied one or more `-t` arguments
 /// * `repos` is an `Iter` over the repos with tag `tag`
-/// * There will be one or more items yielded from the `TagIter` (note
-///   that the same `Repo` may be yielded multiple times if it matches
-///   multiple `-t` arguments)
+/// * There will be one or more items yielded from the `TagIter` (note that the
+/// same `Repo` may be yielded multiple times if it matches multiple `-t`
+/// arguments)
 pub struct TagIter<'a> {
     /// Reference to the `Config` to query.
     config: &'a Config,
-    /// Optional reference to a `Vec` of tags through which to
-    /// iterate. `None` indicates no tag arguments were provided by
-    /// the end user.
+    /// Optional reference to a `Vec` of tags through which to iterate. `None`
+    /// indicates no tag arguments were provided by the end user.
     tags: Option<Vec<&'a str>>,
-    /// Indices into `tags` for the remaining tags. Values are popped
-    /// from the front of this vec as the iterator is consumed. When
-    /// `tags` is `None`, this is a single-item vec whose value
-    /// doesn't matter (see docs for `next()`).
+    /// Indices into `tags` for the remaining tags. Values are popped from the
+    /// front of this vec as the iterator is consumed. When `tags` is `None`,
+    /// this is a single-item vec whose value doesn't matter (see docs for
+    /// `next()`).
     indices: Vec<usize>,
 }
 
@@ -999,17 +961,16 @@ impl<'a> TagIter<'a> {
 impl<'a> Iterator for TagIter<'a> {
     type Item = (Option<&'a str>, Iter<'a>);
 
-    /// Pops the first index off the front of `indices`, then uses
-    /// that to determine what to yield.
+    /// Pops the first index off the front of `indices`, then uses that to
+    /// determine what to yield.
     ///
-    /// When `tags` is a vec, this yields the tag at the index and an
-    /// `Iter` over the repos with the specified tag.
+    /// When `tags` is a vec, this yields the tag at the index and an `Iter`
+    /// over the repos with the specified tag.
     ///
-    /// When `tags` is `None`, this discards the index value and
-    /// yields `None` for the tag and an `Iter` over all configured
-    /// repos. (The next time `next()` is called, `indices` is empty
-    /// and [just] `None` is yielded, stopping iteration after the
-    /// first pass.)
+    /// When `tags` is `None`, this discards the index value and yields `None`
+    /// for the tag and an `Iter` over all configured repos. (The next time
+    /// `next()` is called, `indices` is empty and [just] `None` is yielded,
+    /// stopping iteration after the first pass.)
     fn next(&mut self) -> Option<Self::Item> {
         if self.indices.is_empty() {
             return None;
@@ -1024,10 +985,10 @@ impl<'a> Iterator for TagIter<'a> {
     }
 }
 
-// ----- Invocation -----------------------------------------------------------
+// ----- Invocation ---------------------------------------------------------------------------------------------------
 
-/// Pager command and arguments. Tries to act like a number of git
-/// porcelain commands, like `git diff`.
+/// Pager command and arguments. Tries to act like a number of git porcelain
+/// commands, like `git diff`.
 const PAGER: &str = "less -efFnrX";
 
 /// All state for a given invocation of the program.
@@ -1042,11 +1003,7 @@ pub struct Invocation<'a> {
 
 impl<'a> Invocation<'a> {
     /// Creates and returns a new invocation instance.
-    fn new(
-        control: Control,
-        config: Config,
-        matches: &ArgMatches<'a>,
-    ) -> Self {
+    fn new(control: Control, config: Config, matches: &ArgMatches<'a>) -> Self {
         Self {
             config,
             control,
@@ -1064,8 +1021,8 @@ impl<'a> Invocation<'a> {
         &self.matches
     }
 
-    /// Returns a `TagIter` based on the end-user arguments supplied
-    /// in the argument named `arg`.
+    /// Returns a `TagIter` based on the end-user arguments supplied in the
+    /// argument named `arg`.
     ///
     /// See the documentation for `TagIter` for a full explanation.
     pub fn iter_tags(&self, arg: &str) -> TagIter {

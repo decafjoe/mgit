@@ -39,25 +39,15 @@ pub fn run(invocation: &Invocation) {
     let header = Style::new().bold().underline();
     for (tag, repos) in invocation.iter_tags(TAG_ARG) {
         if let Some(tag) = tag {
-            println!(
-                "\n{}{}",
-                header.paint("TAG:"),
-                header.paint(tag)
-            );
+            println!("\n{}{}", header.paint("TAG:"), header.paint(tag));
         } else {
             println!();
         }
-        for (path, repo) in repos
-            .iter_field(Field::Path)
-            .sorted_by(Field::Path)
-        {
-            // Compute and take references to certain values. We do
-            // this before creating the `info` map below so that
-            // things are deallocated in the correct order.
-            let name_default =
-                &format!("{} (default)", repo.name_or_default());
-            let symbol_default =
-                &format!("{} (default)", repo.symbol_or_default());
+        for (path, repo) in repos.iter_field(Field::Path).sorted_by(Field::Path) {
+            // Compute and take references to certain values. We do this before creating
+            // the `info` map below so that things are deallocated in the correct order.
+            let name_default = &format!("{} (default)", repo.name_or_default());
+            let symbol_default = &format!("{} (default)", repo.symbol_or_default());
 
             let tags_vec = repo.tags();
             let tags = if tags_vec.is_empty() {
@@ -73,11 +63,10 @@ pub fn run(invocation: &Invocation) {
                 s
             };
 
-            // Buffer information into a hashmap that iterates in
-            // insertion order. We need to buffer since we want to
-            // draw ┖ on the last line instead of ┠, and we don't know
-            // what the last line is until we look at all the settings
-            // (taking `verbose` into consideration).
+            // Buffer information into a hashmap that iterates in insertion order. We need
+            // to buffer since we want to draw ┖ on the last line instead of ┠, and we
+            // don't know what the last line is until we look at all the settings (taking
+            // `verbose` into consideration).
             let mut info = IndexMap::new();
             info.insert("config", repo.config_path());
             info.insert("path", repo.full_path());
@@ -101,8 +90,8 @@ pub fn run(invocation: &Invocation) {
                 info.insert("tags", &tags);
             }
 
-            // Pretty-print information, "keyed" by the user-specified
-            // path from the configuration.
+            // Pretty-print information, "keyed" by the user-specified path from the
+            // configuration.
             println!("{}", Color::Purple.bold().paint(path));
             for (i, (key, value)) in info.iter().enumerate() {
                 // 2500 is "─" (light horizontal box drawing character)
@@ -120,8 +109,7 @@ pub fn run(invocation: &Invocation) {
                 } else {
                     "\u{2520}"
                 };
-                // Box-drawing chars and key in blue, value in default
-                // terminal color.
+                // Box-drawing chars and key in blue, value in default terminal color.
                 println!(
                     "{}{}",
                     Color::Blue.paint(format!("  {}{}{}: ", v, h, key)),

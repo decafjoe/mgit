@@ -5,7 +5,7 @@ use git2::{Branch, BranchType, Oid, Repository};
 
 use app::Error;
 
-// ----- Kind ---------------------------------------------------------------
+// ----- Kind ---------------------------------------------------------------------------------------------------------
 
 /// Generic indicator for "result" or "status."
 #[derive(Clone, PartialEq, PartialOrd)]
@@ -20,7 +20,7 @@ pub enum Kind {
     Failure,
 }
 
-// ----- Note -----------------------------------------------------------------
+// ----- Note ---------------------------------------------------------------------------------------------------------
 
 /// Represents an item in a `Summary`.
 #[derive(Clone)]
@@ -59,19 +59,16 @@ impl Note {
     }
 }
 
-// ----- Iter -----------------------------------------------------------------
+// ----- Iter ---------------------------------------------------------------------------------------------------------
 
 /// Iterator for a `Summary`.
 ///
 /// Items are yielded in consistent order. They're first sorted by
-/// `Note.group()`, then (for notes with equal groups) by
-/// `Note.message()`.
+/// `Note.group()`, then (for notes with equal groups) by `Note.message()`.
 pub struct Iter<'a> {
-    /// Sorted vec of integer indices into the notes for the
-    /// `Summary`.
+    /// Sorted vec of integer indices into the notes for the `Summary`.
     indices: Vec<usize>,
-    /// Reference to the summary containing the notes to iterate
-    /// through.
+    /// Reference to the summary containing the notes to iterate through.
     summary: &'a Summary,
 }
 
@@ -81,18 +78,14 @@ impl<'a> Iter<'a> {
         let notes = summary.notes();
         let mut indices = (0..summary.notes().len()).collect::<Vec<usize>>();
         indices.sort_by_key(|i| (notes[*i].group(), notes[*i].message()));
-        Self {
-            indices,
-            summary,
-        }
+        Self { indices, summary }
     }
 }
 
 impl<'a> Iterator for Iter<'a> {
     type Item = &'a Note;
 
-    /// Returns the next note (in order), or `None` if iteration is
-    /// complete.
+    /// Returns the next note (in order), or `None` if iteration is complete.
     fn next(&mut self) -> Option<Self::Item> {
         if self.indices.is_empty() {
             None
@@ -102,10 +95,9 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-// ----- Summary --------------------------------------------------------------
+// ----- Summary ------------------------------------------------------------------------------------------------------
 
-/// Represents a summary of current status or the results of an
-/// operation.
+/// Represents a summary of current status or the results of an operation.
 pub struct Summary {
     /// Vec of notes comprising the summary.
     notes: Vec<Note>,
@@ -114,21 +106,18 @@ pub struct Summary {
 impl Summary {
     /// Creates and returns a new `Summary` instance.
     pub fn new() -> Self {
-        Self {
-            notes: Vec::new(),
-        }
+        Self { notes: Vec::new() }
     }
 
-    /// Adds a new `Note` to this summary. Takes ownership of the
-    /// `note` instance.
+    /// Adds a new `Note` to this summary. Takes ownership of the `note`
+    /// instance.
     pub fn push_note(&mut self, note: Note) {
         self.notes.push(note)
     }
 
     /// Adds the contents of `other` summary to this summary.
     ///
-    /// Note that this copies the `Note` instances referenced by
-    /// `other`.
+    /// Note that this copies the `Note` instances referenced by `other`.
     pub fn push_summary(&mut self, other: &Self) {
         for note in other.notes() {
             self.notes.push(note.clone());
@@ -161,7 +150,7 @@ impl Summary {
     }
 }
 
-// ----- TrackingBranch -------------------------------------------------------
+// ----- TrackingBranch -----------------------------------------------------------------------------------------------
 
 /// Convenience wrapper for a tracking branch.
 pub struct TrackingBranch<'a> {
@@ -170,8 +159,7 @@ pub struct TrackingBranch<'a> {
 }
 
 impl<'a> TrackingBranch<'a> {
-    /// Creates and returns a new `TrackingBranch` instance for local
-    /// `branch`.
+    /// Creates and returns a new `TrackingBranch` instance for local `branch`.
     fn new(branch: Branch<'a>) -> Self {
         Self { branch }
     }
@@ -223,22 +211,21 @@ impl<'a> TrackingBranch<'a> {
     }
 }
 
-// ----- TrackingBranches -----------------------------------------------------
+// ----- TrackingBranches ---------------------------------------------------------------------------------------------
 
 /// Convenience iterator for iterating through tracking branches.
 ///
-/// The main feature of this struct is the validation done on
-/// initialization. For each local branch this checks:
+/// The main feature of this struct is the validation done on initialization.
+/// For each local branch this checks:
 ///
-/// * That the branch has an upstream (if not, the branch will not be
-///   yielded from the iterator)
-/// * That the local branch has a (valid utf-8) name
+/// * That the branch has an upstream (if not, the branch will not be yielded
+/// from the iterator) * That the local branch has a (valid utf-8) name
 /// * That we can get the local branch's oid
 /// * That the upstream branch has a (valid utf-8) name
 /// * That we can get the upstream branch's oid
 ///
-/// As a result, for branches yielded from this iterator, it is safe
-/// to unwrap the values returned by the git2 API for name and oid.
+/// As a result, for branches yielded from this iterator, it is safe to unwrap
+/// the values returned by the git2 API for name and oid.
 pub struct TrackingBranches<'a> {
     /// `Vec` of tracking branches remaining to be iterated through.
     branches: Vec<TrackingBranch<'a>>,
@@ -255,12 +242,9 @@ impl<'a> TrackingBranches<'a> {
     }
 
     /// Creates and returns a new `TrackingBranches` iterator for the
-    /// repository `git`, limited to tracking branches whose upstream
-    /// is the remote named `name`.
-    pub fn for_remote(
-        git: &'a Repository,
-        name: &str,
-    ) -> Result<Self, Vec<Error>> {
+    /// repository `git`, limited to tracking branches whose upstream is the
+    /// remote named `name`.
+    pub fn for_remote(git: &'a Repository, name: &str) -> Result<Self, Vec<Error>> {
         match TrackingBranches::get(git) {
             Ok(branches) => {
                 let mut remote_branches = Vec::new();
@@ -277,12 +261,10 @@ impl<'a> TrackingBranches<'a> {
         }
     }
 
-    /// Returns a vec of local `TrackingBranch` references that
-    /// represent valid (per the description in the struct
-    /// documentation) local branch references.
-    fn get(
-        git: &'a Repository,
-    ) -> Result<Vec<TrackingBranch<'a>>, Vec<Error>> {
+    /// Returns a vec of local `TrackingBranch` references that represent valid
+    /// (per the description in the struct documentation) local branch
+    /// references.
+    fn get(git: &'a Repository) -> Result<Vec<TrackingBranch<'a>>, Vec<Error>> {
         let branches = match git.branches(Some(BranchType::Local)) {
             Ok(branches) => branches,
             Err(e) => {
@@ -310,9 +292,7 @@ impl<'a> TrackingBranches<'a> {
                     Ok(name) => if let Some(name) = name {
                         name
                     } else {
-                        errors.push(Error::new(
-                            "local branch name is not valid utf-8",
-                        ));
+                        errors.push(Error::new("local branch name is not valid utf-8"));
                         continue;
                     },
                     Err(e) => {
@@ -333,8 +313,8 @@ impl<'a> TrackingBranches<'a> {
                 let upstream = if let Ok(upstream) = local.upstream() {
                     upstream
                 } else {
-                    // Assume there is no upstream branch (though
-                    // technically this could be an actual error).
+                    // Assume there is no upstream branch (though technically this could be an
+                    // actual error).
                     continue;
                 };
                 let upstream_name = match upstream.name() {
@@ -342,16 +322,14 @@ impl<'a> TrackingBranches<'a> {
                         name
                     } else {
                         errors.push(Error::new(&format!(
-                            "upstream branch name for local branch '{}' is \
-                             not valid utf-8",
+                            "upstream branch name for local branch '{}' is not valid utf-8",
                             local_name
                         )));
                         continue;
                     },
                     Err(e) => {
                         errors.push(Error::new(&format!(
-                            "failed to get name of upstream branch for local \
-                             branch {} ({})",
+                            "failed to get name of upstream branch for local branch {} ({})",
                             local_name, e
                         )));
                         continue;
@@ -359,8 +337,7 @@ impl<'a> TrackingBranches<'a> {
                 };
                 if upstream.get().target().is_none() {
                     errors.push(Error::new(&format!(
-                        "failed to resolve oid for upstream branch {} (local \
-                         branch is {})",
+                        "failed to resolve oid for upstream branch {} (local branch is {})",
                         upstream_name, local_name
                     )));
                     continue;
