@@ -61,7 +61,7 @@ pub fn init<'a>(commands: &'a [Command<'a>]) -> (Invocation<'a>, &'a Command<'a>
     // Attach each of the subcommands and their arguments.
     for command in commands {
         let mut subcommand = SubCommand::with_name(command.name).about(command.about);
-        for arg in &command.args {
+        for arg in command.args() {
             subcommand = subcommand.arg(arg);
         }
         app = app.subcommand(subcommand);
@@ -136,16 +136,13 @@ pub struct Command<'a> {
     /// Short one-line description of the command.
     about: &'a str,
     /// Vec of clap arguments for the command.
-    args: Vec<Arg<'a, 'a>>,
+    args: fn() -> Vec<Arg<'a, 'a>>,
     /// Reference to function to invoke when command is called.
     run: fn(&Invocation),
 }
 
 impl<'a> Command<'a> {
     /// Create and return a new `Command` instance.
-    ///
-    /// Note that the `args` argument will be called in order to populate the
-    /// `args` member.
     pub fn new(
         name: &'a str,
         about: &'a str,
@@ -155,9 +152,14 @@ impl<'a> Command<'a> {
         Self {
             name,
             about,
-            args: args(),
+            args,
             run,
         }
+    }
+
+    /// Invoke the function that returns arguments for the command.
+    pub fn args(&self) -> Vec<Arg> {
+        (self.args)()
     }
 
     /// Invoke the function that "runs" the subcommand.
