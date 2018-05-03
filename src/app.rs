@@ -2,15 +2,21 @@
 use std::{
     collections::HashMap,
     env,
+    fmt::{self, Debug, Formatter},
     fs::File,
     hash::{Hash, Hasher},
     io::Read,
     iter::Iterator,
     path::{Path, PathBuf, MAIN_SEPARATOR},
     process,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use ansi_term::{Color, Style};
+use chan::Sender;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use git2::Repository;
 use ini::Ini;
@@ -31,7 +37,11 @@ const WARNING_ARG: &str = "WARNING";
 /// Initializes the application, attaches subcommands, parses user input, reads
 /// configuration, populates the invocation instance and returns it along with
 /// a reference to the subcommand that was invoked by the user.
-pub fn init<'a>(commands: &'a [Command<'a>]) -> (Invocation<'a>, &'a Command<'a>) {
+pub fn init<'a>(
+    _: Sender<()>,
+    terminate: Arc<AtomicBool>,
+    commands: &'a [Command<'a>],
+) -> Invocation<'a> {
     // Configure the top-level app instance.
     let mut app = App::new(NAME)
         .version(crate_version!())
@@ -119,7 +129,7 @@ pub fn init<'a>(commands: &'a [Command<'a>]) -> (Invocation<'a>, &'a Command<'a>
     // newly-created invocation instance to the caller.
     for command in commands {
         if let Some(m) = matches.subcommand_matches(command.name) {
-            return (Invocation::new(control, config, m), command);
+            return Invocation::new(terminate, control, config, command, m);
         }
     }
 
@@ -132,39 +142,35 @@ pub fn init<'a>(commands: &'a [Command<'a>]) -> (Invocation<'a>, &'a Command<'a>
 /// Convenience wrapper around the configuration that makes up a "command."
 pub struct Command<'a> {
     /// Name of the command.
-    name: &'a str,
+    pub name: &'a str,
     /// Short one-line description of the command.
-    about: &'a str,
+    pub about: &'a str,
     /// Vec of clap arguments for the command.
-    args: fn() -> Vec<Arg<'a, 'a>>,
+    pub args: fn() -> Vec<Arg<'a, 'a>>,
     /// Reference to function to invoke when command is called.
-    run: fn(&Invocation),
+    pub run: fn(&Invocation),
 }
 
 impl<'a> Command<'a> {
-    /// Create and return a new `Command` instance.
-    pub fn new(
-        name: &'a str,
-        about: &'a str,
-        args: fn() -> Vec<Arg<'a, 'a>>,
-        run: fn(&Invocation),
-    ) -> Self {
-        Self {
-            name,
-            about,
-            args,
-            run,
-        }
-    }
-
     /// Invoke the function that returns arguments for the command.
     pub fn args(&self) -> Vec<Arg> {
         (self.args)()
     }
 
     /// Invoke the function that "runs" the subcommand.
-    pub fn run(&self, invocation: &Invocation) {
+    pub fn run(&self, _: Sender<()>, invocation: &Invocation) {
         (self.run)(invocation)
+    }
+}
+
+impl<'a> Debug for Command<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Command {{ name: {}, about: {}\u{2026} }}",
+            &self.name,
+            &self.about[..32]
+        )
     }
 }
 
@@ -1003,17 +1009,30 @@ pub struct Invocation<'a> {
     config: Config,
     /// `Control` instance.
     control: Control,
+    /// `Command` instance.
+    command: &'a Command<'a>,
     /// `ArgMatches` instance, for the subcommand arguments.
     matches: ArgMatches<'a>,
+    /// Holds the reference to the refcell containing the "should terminate"
+    /// flag.
+    terminate: Arc<AtomicBool>,
 }
 
 impl<'a> Invocation<'a> {
     /// Creates and returns a new invocation instance.
-    fn new(control: Control, config: Config, matches: &ArgMatches<'a>) -> Self {
+    fn new(
+        terminate: Arc<AtomicBool>,
+        control: Control,
+        config: Config,
+        command: &'a Command,
+        matches: &ArgMatches<'a>,
+    ) -> Self {
         Self {
             config,
             control,
+            command,
             matches: matches.clone(),
+            terminate,
         }
     }
 
@@ -1022,9 +1041,20 @@ impl<'a> Invocation<'a> {
         &self.control
     }
 
+    /// Returns the command instance for this invocation.
+    pub fn command(&self) -> &Command {
+        &self.command
+    }
+
     /// Returns the matches struct for this invocation.
     pub fn matches(&self) -> &ArgMatches {
         &self.matches
+    }
+
+    /// Returns `true` if termination signal has been receieved, meaning the
+    /// command should clean up and terminate as soon as possible.
+    pub fn should_terminate(&self) -> bool {
+        self.terminate.load(Ordering::Relaxed)
     }
 
     /// Returns a `TagIter` based on the end-user arguments supplied in the
