@@ -200,7 +200,8 @@ impl Error {
 /// If the path starts with the system `MAIN_SEPARATOR`, it's assumed to be
 /// absolute and is left unchanged.
 ///
-/// Otherwise, the path is assumed to be relative to `rel`. If `rel` does not have a value (i.e. is `None`) then the current working directory is used.
+/// Otherwise, the path is assumed to be relative to `rel`. If `rel` does not
+/// have a value (i.e. is `None`) then the current working directory is used.
 ///
 /// Once the path has been resolved per the above, it is canonicalized using
 /// `std::fs::canonicalize` and finally returned.
@@ -911,7 +912,10 @@ impl Control {
 
 /// Weird, kind of hacky iterator to support a common UI pattern.
 ///
-/// Let me explain. All the subcommands take (zero or more) `-t/--tag` arguments. This struct works in conjunction with `Invocation.iter_tags()` to let calling code handle those arguments without doing a bunch of legwork.
+/// Let me explain. All the subcommands take (zero or more) `-t/--tag`
+/// arguments. This struct works in conjunction with
+/// `Invocation.iter_tags()` to let calling code handle those arguments without
+/// doing a bunch of legwork.
 ///
 /// ```rust,ignore
 /// for (tag, repos) in invocation.iter_tags(TAG_ARG) {
