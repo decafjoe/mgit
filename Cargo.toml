@@ -1,6 +1,6 @@
 [package]
 name = "mgit"
-version = "0.3.3-a0"
+version = "0.4.0-a0"
 authors = ["Joe Joyce <joe@decafjoe.com>"]
 
 [dependencies]
