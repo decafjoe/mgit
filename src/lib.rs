@@ -22,13 +22,21 @@
 //! repositories won't be changed from the outside while mgit is running. (And
 //! if they are, the effect is that some results may be out-of-date – nothing
 //! critical.)
+#![cfg_attr(feature = "flame_mgit", feature(plugin, custom_attribute))]
+#![cfg_attr(feature = "flame_mgit", plugin(flamer))]
+#![cfg_attr(feature = "flame_mgit", flame)]
+
 extern crate ansi_term;
 #[macro_use]
 extern crate chan;
 extern crate chan_signal;
+#[cfg(feature = "flame_mgit")]
+extern crate chrono;
 #[macro_use]
 extern crate clap;
 extern crate crossbeam;
+#[cfg(feature = "flame_mgit")]
+extern crate flame;
 extern crate git2;
 extern crate indexmap;
 extern crate ini;
@@ -39,6 +47,8 @@ extern crate walkdir;
 
 mod app;
 mod cmd;
+#[cfg(feature = "flame_mgit")]
+mod ext;
 mod ui;
 
 use std::{
@@ -76,6 +86,12 @@ static COMMANDS: [Command; 3] = [
     },
 ];
 
+#[cfg(feature = "flame_mgit")]
+fn exit(code: i32) {
+    ext::exit(code);
+}
+
+#[cfg(not(feature = "flame_mgit"))]
 fn exit(code: i32) {
     process::exit(code);
 }

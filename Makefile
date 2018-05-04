@@ -4,6 +4,8 @@
 CARGO ?= cargo
 
 ROOT := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+FLAME_FEATURE_NAME = flame_mgit
+FLAME_TARGET_DIR = $(ROOT)/target/flame
 
 
 help :
@@ -23,6 +25,11 @@ help :
 	@printf "          dev  Compile with dev profile to target/debug/\n"
 	@printf "          rel  Compile with release profile "
 	@printf                 "to target/release/\n"
+	@printf "\n"
+	@printf "        flame  Compile with $(FLAME_FEATURE_NAME) and dev "
+	@printf                 "profile to target/flame/debug/\n"
+	@printf "    flame-rel  Compile with $(FLAME_FEATURE_NAME) and "
+	@printf                 "release profile to target/flame/release/\n"
 	@printf "\n"
 
 
@@ -49,5 +56,15 @@ check-update:
 dev :
 	cd $(ROOT); $(CARGO) build
 
+flame :
+	cd $(ROOT); CARGO_TARGET_DIR=$(FLAME_TARGET_DIR) \
+		$(CARGO) +nightly build --features $(FLAME_FEATURE_NAME)
+
 rel :
 	cd $(ROOT); $(CARGO) build --release
+
+flame-rel :
+	cd $(ROOT); CARGO_TARGET_DIR=$(FLAME_TARGET_DIR) \
+		$(CARGO) +nightly build \
+			--features $(FLAME_FEATURE_NAME) \
+			--release

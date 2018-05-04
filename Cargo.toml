@@ -7,8 +7,11 @@ authors = ["Joe Joyce <joe@decafjoe.com>"]
 ansi_term = "~0.11.0"
 chan = "~0.1.21"
 chan-signal = "~0.3.1"
+chrono = { version = "~0.4.2", optional = true }
 clap = { version = "~2.31.2", features = ["wrap_help"] }
 crossbeam = "~0.3.2"
+flame = { git = "https://github.com/TyOverby/flame", optional = true }
+flamer = { version = "~0.2.1", optional = true }
 git2 = "~0.7.1"
 indexmap = "~1.0.1"
 pager = "~0.14.0"
@@ -16,3 +19,7 @@ rust-ini = "~0.11.0"
 termion = "~1.5.1"
 users = "~0.6.1"
 walkdir = "~2.1.4"
+
+[features]
+default = []
+flame_mgit = ["chrono", "flame", "flamer"]

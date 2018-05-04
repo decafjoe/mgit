@@ -214,7 +214,7 @@ impl Error {
 ///
 /// Once the path has been resolved per the above, it is canonicalized using
 /// `std::fs::canonicalize` and finally returned.
-fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
+pub fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
     let mut relative_to = match rel {
         Some(path) => {
             // Caller passed relative_to. If a directory, return as-is. Otherwise, figure
