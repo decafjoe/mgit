@@ -95,7 +95,10 @@ pub fn main() {
     // Initialize the application, allowing a term signal to immediately exit the
     // process.
     let (init_done_tx, init_done) = chan::sync(0);
-    let init_guard = thread::spawn(move || init(init_done_tx, exit, init_terminate_arc, &COMMANDS));
+    let init_guard = thread::Builder::new()
+        .name("init".to_string())
+        .spawn(move || init(init_done_tx, exit, init_terminate_arc, &COMMANDS))
+        .expect("failed to spawn thread for initialization");
     chan_select! {
         init_done.recv() => {},
         terminate_signal.recv() -> _ => {
@@ -112,7 +115,10 @@ pub fn main() {
     // Run the subcommand in a separate thread, keeping the main thread free to
     // listen for terminate signals.
     let (run_done_tx, run_done) = chan::sync(0);
-    thread::spawn(move || invocation.command().run(run_done_tx, &invocation));
+    thread::Builder::new()
+        .name("command".to_string())
+        .spawn(move || invocation.command().run(run_done_tx, &invocation))
+        .expect("failed to spawn thread for running command");
 
     // If we get a terminate signal, set the "should terminate" flag. The
     // subcommand can check this via the `Invocation.should_terminate()`

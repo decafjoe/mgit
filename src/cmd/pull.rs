@@ -200,11 +200,15 @@ pub fn run(invocation: &Invocation) {
                     // Tell the UI we have started the fetch.
                     ui.update_state(repo, &name, State::Fetching);
                     let tx = tx.clone();
-                    scope.spawn(move || {
-                        let summary = fetch_and_ff(repo, &name);
-                        tx.send((repo, name, summary))
-                            .expect("failed to transmit results to main thread");
-                    });
+                    scope
+                        .builder()
+                        .name(format!("{}:{}", repo.name_or_default(), name))
+                        .spawn(move || {
+                            let summary = fetch_and_ff(repo, &name);
+                            tx.send((repo, name, summary))
+                                .expect("failed to transmit results to main thread");
+                        })
+                        .expect("failed to spawn thread for pull operation");
                     // Note that a new thread is in use.
                     active += 1;
                 }
