@@ -32,7 +32,6 @@ pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
 }
 
 /// Executes the `config` subcommand.
-#[cfg_attr(feature = "cargo-clippy", allow(print_stdout))]
 pub fn run(invocation: &Invocation) {
     invocation.start_pager();
     let verbose = invocation.matches().is_present(VERBOSE_ARG);

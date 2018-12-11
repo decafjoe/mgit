@@ -72,12 +72,11 @@ pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
 }
 
 /// Executes the `pull` subcommand.
-#[cfg_attr(feature = "cargo-clippy", allow(print_stdout))]
 pub fn run(invocation: &Invocation) {
     let concurrent_str = invocation
         .matches()
         .value_of(CONCURRENT_ARG)
-        .expect(&format!("{} to have an argument", CONCURRENT_ARG));
+        .unwrap_or_else(|| panic!("expected {} to have an argument", CONCURRENT_ARG));
     let concurrent = match concurrent_str.parse::<u8>() {
         Ok(concurrent) => concurrent,
         Err(e) => {
@@ -619,10 +618,7 @@ impl<'a, W: Write> UI<'a, W> {
     ///
     /// **This is an internal method and should not be called outside the
     /// impl.**
-    #[cfg_attr(
-        feature = "cargo-clippy",
-        allow(cast_possible_truncation, many_single_char_names)
-    )]
+    #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
     fn draw(&mut self, w: u16, h: u16, results: &Results) {
         // We do some calculations where we need width and height as a usize, so we
         // just assign them some variables.
