@@ -260,10 +260,12 @@ fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
         } else {
             // Fully specified user (e.g. `~foo/...`) -- extract username and look up home
             // directory.
-            let name = path[1..].split(MAIN_SEPARATOR).nth(0).expect(&format!(
-                "splitting '{}' on MAIN_SEPARATOR ('{}') failed",
-                path, MAIN_SEPARATOR
-            ));
+            let name = path[1..].split(MAIN_SEPARATOR).nth(0).unwrap_or_else(|| {
+                panic!(
+                    "splitting '{}' on MAIN_SEPARATOR ('{}') failed",
+                    path, MAIN_SEPARATOR
+                )
+            });
             if let Some(user) = users::get_user_by_name(name) {
                 let mut buf = user.home_dir().to_path_buf();
                 if path.len() > name.len() + 1 {
@@ -416,7 +418,7 @@ impl Repo {
     }
 
     /// Returns the (optionally-set) name of the repository.
-    #[cfg_attr(feature = "cargo-clippy", allow(match_as_ref))]
+    #[allow(clippy::match_as_ref)]
     pub fn name(&self) -> Option<&str> {
         match self.name {
             Some(ref name) => Some(name),
@@ -425,7 +427,7 @@ impl Repo {
     }
 
     /// Returns the (optionally-set) symbol the repository.
-    #[cfg_attr(feature = "cargo-clippy", allow(match_as_ref))]
+    #[allow(clippy::match_as_ref)]
     pub fn symbol(&self) -> Option<&str> {
         match self.symbol {
             Some(ref symbol) => Some(symbol),
@@ -468,10 +470,8 @@ impl Repo {
 
     /// Returns a new `git2::Repository` instance for this repo.
     pub fn git(&self) -> Repository {
-        Repository::open(&self.full_path).expect(&format!(
-            "failed to open git repository at '{}'",
-            self.full_path
-        ))
+        Repository::open(&self.full_path)
+            .unwrap_or_else(|_| panic!("failed to open git repository at '{}'", self.full_path))
     }
 }
 

@@ -50,7 +50,6 @@ pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
 }
 
 /// Executes the `status` subcommand.
-#[cfg_attr(feature = "cargo-clippy", allow(print_stdout))]
 pub fn run(invocation: &Invocation) {
     invocation.start_pager();
     let verbose = invocation.matches().is_present(VERBOSE_ARG);
@@ -204,10 +203,12 @@ pub fn run(invocation: &Invocation) {
 
                 cache.insert(repo, summary);
             }
-            let summary = cache.get(repo).expect(&format!(
-                "failed to get summary from cache for repo '{}'",
-                repo.name_or_default()
-            ));
+            let summary = cache.get(repo).unwrap_or_else(|| {
+                panic!(
+                    "failed to get summary from cache for repo '{}'",
+                    repo.name_or_default()
+                )
+            });
             let color = match summary.kind() {
                 Kind::None | Kind::Success => Color::Green,
                 Kind::Warning => Color::Yellow,

@@ -30,7 +30,7 @@ fmt :
 	cd $(ROOT); $(CARGO) fmt -- --check
 
 lint :
-	cd $(ROOT); $(CARGO) clippy -- -Wclippy-pedantic
+	cd $(ROOT); $(CARGO) clippy -- -W 'clippy::pedantic'
 
 test :
 	cd $(ROOT); $(CARGO) test
