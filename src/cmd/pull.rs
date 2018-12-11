@@ -13,9 +13,7 @@ use clap::Arg;
 use crossbeam;
 use git2::{ObjectType, ResetType, StatusOptions, StatusShow};
 use termion::{
-    self,
-    clear,
-    cursor,
+    self, clear, cursor,
     raw::{IntoRawMode, RawTerminal},
 };
 
@@ -87,7 +85,7 @@ pub fn run(invocation: &Invocation) {
                 "failed to interpret value '{}' for {} ({})",
                 concurrent_str, CONCURRENT_ARG, e
             ));
-        },
+        }
     };
     if concurrent < 1 {
         invocation.control().fatal(&format!(
@@ -132,25 +130,27 @@ pub fn run(invocation: &Invocation) {
         for repo in repo_set {
             let mut summary = Summary::new();
             match repo.git().remotes() {
-                Ok(names) => for name in names.iter() {
-                    if let Some(name) = name {
-                        remotes.push((repo, name.to_owned()));
-                        ui.push_remote(repo, name);
-                    } else {
-                        summary.push_note(Note::new(
-                            FETCH_FAILURE_GROUP,
-                            Kind::Failure,
-                            "skipped remote with invalid utf-8 name",
-                        ));
+                Ok(names) => {
+                    for name in names.iter() {
+                        if let Some(name) = name {
+                            remotes.push((repo, name.to_owned()));
+                            ui.push_remote(repo, name);
+                        } else {
+                            summary.push_note(Note::new(
+                                FETCH_FAILURE_GROUP,
+                                Kind::Failure,
+                                "skipped remote with invalid utf-8 name",
+                            ));
+                        }
                     }
-                },
+                }
                 Err(e) => {
                     summary.push_note(Note::new(
                         FETCH_FAILURE_GROUP,
                         Kind::Failure,
                         &format!("failed to get remotes ({})", e),
                     ));
-                },
+                }
             }
             results.insert(repo, summary);
         }
@@ -317,20 +317,22 @@ fn fetch_and_ff(repo: &Repo, name: &str) -> Summary {
         .current_dir(repo.full_path())
         .output();
     let error = match out {
-        Ok(out) => if out.status.success() {
-            None
-        } else {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            let rv = if stdout.len() > 0 && stderr.len() > 0 {
-                format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr)
-            } else if stdout.len() > 0 {
-                stdout.into_owned()
+        Ok(out) => {
+            if out.status.success() {
+                None
             } else {
-                stderr.into_owned()
-            };
-            Some(rv)
-        },
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                let rv = if stdout.len() > 0 && stderr.len() > 0 {
+                    format!("STDOUT:\n{}\nSTDERR:\n{}", stdout, stderr)
+                } else if stdout.len() > 0 {
+                    stdout.into_owned()
+                } else {
+                    stderr.into_owned()
+                };
+                Some(rv)
+            }
+        }
         Err(e) => Some(format!("{}", e)),
     };
     let git = repo.git();
@@ -347,130 +349,141 @@ fn fetch_and_ff(repo: &Repo, name: &str) -> Summary {
             &format!("fetched from {}", name),
         ));
         match TrackingBranches::for_remote(&git, name) {
-            Ok(branches) => for branch in branches {
-                let local_name = branch.local_name();
-                let upstream_name = branch.upstream_name();
-                let upstream_oid = branch.upstream_oid();
-                let (ahead, behind) = match git.graph_ahead_behind(branch.local_oid(), upstream_oid)
-                {
-                    Ok((ahead, behind)) => (ahead, behind),
-                    Err(e) => {
-                        summary.push_note(Note::new(
-                            BRANCH_FAILURE_GROUP,
-                            Kind::Failure,
-                            &format!(
-                                "failed to determine relationship between local branch {} and \
-                                 upstream branch {} ({})",
-                                local_name, upstream_name, e,
-                            ),
-                        ));
-                        continue;
-                    },
-                };
-                if ahead > 0 && behind > 0 {
-                    summary.push_note(Note::new(
-                        BRANCH_STATUS_GROUP,
-                        Kind::Failure,
-                        &format!(
-                            "{} has diverged from {} ({} and {} commits)",
-                            local_name, upstream_name, ahead, behind
-                        ),
-                    ));
-                } else if ahead > 0 {
-                    let s = if ahead == 1 { "" } else { "s" };
-                    summary.push_note(Note::new(
-                        BRANCH_STATUS_GROUP,
-                        Kind::Warning,
-                        &format!(
-                            "{} is ahead of {} by {} commit{}",
-                            local_name, upstream_name, ahead, s
-                        ),
-                    ));
-                } else if behind > 0 {
-                    if branch.local().is_head() {
-                        let mut status_options = StatusOptions::new();
-                        status_options.show(StatusShow::IndexAndWorkdir);
-                        status_options.exclude_submodules(true);
-                        status_options.renames_head_to_index(true);
-                        status_options.renames_index_to_workdir(true);
-                        status_options.renames_from_rewrites(true);
-                        status_options.include_untracked(true);
-                        let error_message =
-                            &format!("failed to fast-forward {} to {}", local_name, upstream_name);
-                        match git.statuses(Some(&mut status_options)) {
-                            Ok(statuses) => if !statuses.is_empty() {
-                                summary.push_note(Note::new(
-                                    BRANCH_FAILURE_GROUP,
-                                    Kind::Failure,
-                                    &format!("{} (worktree is dirty)", error_message),
-                                ));
-                                continue;
-                            },
+            Ok(branches) => {
+                for branch in branches {
+                    let local_name = branch.local_name();
+                    let upstream_name = branch.upstream_name();
+                    let upstream_oid = branch.upstream_oid();
+                    let (ahead, behind) =
+                        match git.graph_ahead_behind(branch.local_oid(), upstream_oid) {
+                            Ok((ahead, behind)) => (ahead, behind),
                             Err(e) => {
                                 summary.push_note(Note::new(
                                     BRANCH_FAILURE_GROUP,
                                     Kind::Failure,
                                     &format!(
-                                        "{} (could not get worktree status) ({})",
-                                        error_message, e
-                                    ),
+                                "failed to determine relationship between local branch {} and \
+                                 upstream branch {} ({})",
+                                local_name, upstream_name, e,
+                            ),
                                 ));
                                 continue;
-                            },
-                        }
-                    }
-                    let ref_name = &format!("refs/heads/{}", local_name);
-                    let mut local_reference = git.find_reference(ref_name)
-                        .expect("failed to get reference for local branch");
-                    if let Err(e) = local_reference.set_target(upstream_oid, "mgit: fast-forward") {
+                            }
+                        };
+                    if ahead > 0 && behind > 0 {
                         summary.push_note(Note::new(
                             BRANCH_STATUS_GROUP,
                             Kind::Failure,
                             &format!(
-                                "failed to fast-forward {} to {} ({})",
-                                local_name, upstream_name, e
+                                "{} has diverged from {} ({} and {} commits)",
+                                local_name, upstream_name, ahead, behind
                             ),
                         ));
-                    } else {
-                        if branch.local().is_head() {
-                            if let Err(e) = git.reset(
-                                &branch
-                                    .upstream()
-                                    .get()
-                                    .peel(ObjectType::Any)
-                                    .expect("failed to get upstream object"),
-                                ResetType::Hard,
-                                None,
-                            ) {
-                                summary.push_note(Note::new(
-                                    BRANCH_STATUS_GROUP,
-                                    Kind::Failure,
-                                    &format!("failed to hard reset worktree ({})", e),
-                                ));
-                                continue;
-                            }
-                        }
+                    } else if ahead > 0 {
+                        let s = if ahead == 1 { "" } else { "s" };
                         summary.push_note(Note::new(
                             BRANCH_STATUS_GROUP,
-                            Kind::Success,
-                            &format!("fast-forwarded {} to {}", local_name, upstream_name),
+                            Kind::Warning,
+                            &format!(
+                                "{} is ahead of {} by {} commit{}",
+                                local_name, upstream_name, ahead, s
+                            ),
+                        ));
+                    } else if behind > 0 {
+                        if branch.local().is_head() {
+                            let mut status_options = StatusOptions::new();
+                            status_options.show(StatusShow::IndexAndWorkdir);
+                            status_options.exclude_submodules(true);
+                            status_options.renames_head_to_index(true);
+                            status_options.renames_index_to_workdir(true);
+                            status_options.renames_from_rewrites(true);
+                            status_options.include_untracked(true);
+                            let error_message = &format!(
+                                "failed to fast-forward {} to {}",
+                                local_name, upstream_name
+                            );
+                            match git.statuses(Some(&mut status_options)) {
+                                Ok(statuses) => {
+                                    if !statuses.is_empty() {
+                                        summary.push_note(Note::new(
+                                            BRANCH_FAILURE_GROUP,
+                                            Kind::Failure,
+                                            &format!("{} (worktree is dirty)", error_message),
+                                        ));
+                                        continue;
+                                    }
+                                }
+                                Err(e) => {
+                                    summary.push_note(Note::new(
+                                        BRANCH_FAILURE_GROUP,
+                                        Kind::Failure,
+                                        &format!(
+                                            "{} (could not get worktree status) ({})",
+                                            error_message, e
+                                        ),
+                                    ));
+                                    continue;
+                                }
+                            }
+                        }
+                        let ref_name = &format!("refs/heads/{}", local_name);
+                        let mut local_reference = git
+                            .find_reference(ref_name)
+                            .expect("failed to get reference for local branch");
+                        if let Err(e) =
+                            local_reference.set_target(upstream_oid, "mgit: fast-forward")
+                        {
+                            summary.push_note(Note::new(
+                                BRANCH_STATUS_GROUP,
+                                Kind::Failure,
+                                &format!(
+                                    "failed to fast-forward {} to {} ({})",
+                                    local_name, upstream_name, e
+                                ),
+                            ));
+                        } else {
+                            if branch.local().is_head() {
+                                if let Err(e) = git.reset(
+                                    &branch
+                                        .upstream()
+                                        .get()
+                                        .peel(ObjectType::Any)
+                                        .expect("failed to get upstream object"),
+                                    ResetType::Hard,
+                                    None,
+                                ) {
+                                    summary.push_note(Note::new(
+                                        BRANCH_STATUS_GROUP,
+                                        Kind::Failure,
+                                        &format!("failed to hard reset worktree ({})", e),
+                                    ));
+                                    continue;
+                                }
+                            }
+                            summary.push_note(Note::new(
+                                BRANCH_STATUS_GROUP,
+                                Kind::Success,
+                                &format!("fast-forwarded {} to {}", local_name, upstream_name),
+                            ));
+                        }
+                    } else {
+                        summary.push_note(Note::new(
+                            BRANCH_STATUS_GROUP,
+                            Kind::None,
+                            &format!("{} is up to date with {}", local_name, upstream_name),
                         ));
                     }
-                } else {
+                }
+            }
+            Err(errors) => {
+                for error in errors {
                     summary.push_note(Note::new(
-                        BRANCH_STATUS_GROUP,
-                        Kind::None,
-                        &format!("{} is up to date with {}", local_name, upstream_name),
+                        BRANCH_FAILURE_GROUP,
+                        Kind::Failure,
+                        error.message(),
                     ));
                 }
-            },
-            Err(errors) => for error in errors {
-                summary.push_note(Note::new(
-                    BRANCH_FAILURE_GROUP,
-                    Kind::Failure,
-                    error.message(),
-                ));
-            },
+            }
         }
     }
     summary
@@ -605,7 +618,10 @@ impl<'a, W: Write> UI<'a, W> {
     ///
     /// **This is an internal method and should not be called outside the
     /// impl.**
-    #[cfg_attr(feature = "cargo-clippy", allow(cast_possible_truncation, many_single_char_names))]
+    #[cfg_attr(
+        feature = "cargo-clippy",
+        allow(cast_possible_truncation, many_single_char_names)
+    )]
     fn draw(&mut self, w: u16, h: u16, results: &Results) {
         // We do some calculations where we need width and height as a usize, so we
         // just assign them some variables.
@@ -720,7 +736,8 @@ impl<'a, W: Write> UI<'a, W> {
 
                 // Get a sorted list of remotes. Sorting is required to make the UI output
                 // deterministic.
-                let mut remote_names: Vec<&String> = self.state
+                let mut remote_names: Vec<&String> = self
+                    .state
                     .get(*repo)
                     .expect("failed to get state value for repo")
                     .keys()
@@ -749,7 +766,8 @@ impl<'a, W: Write> UI<'a, W> {
                     };
 
                     // Add the stylized remote name to the output string.
-                    let state = self.state
+                    let state = self
+                        .state
                         .get(*repo)
                         .expect("failed to get repo value from state")
                         .get(full_name)

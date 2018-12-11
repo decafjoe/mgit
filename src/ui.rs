@@ -256,7 +256,7 @@ impl<'a> TrackingBranches<'a> {
                 Ok(Self {
                     branches: remote_branches,
                 })
-            },
+            }
             Err(e) => Err(e),
         }
     }
@@ -272,7 +272,7 @@ impl<'a> TrackingBranches<'a> {
                     "failed to fetch local branch data ({})",
                     e
                 ))]);
-            },
+            }
         };
         let mut rv = Vec::new();
         let mut errors = Vec::new();
@@ -285,23 +285,25 @@ impl<'a> TrackingBranches<'a> {
                         e
                     )));
                     continue;
-                },
+                }
             };
             {
                 let local_name = match local.name() {
-                    Ok(name) => if let Some(name) = name {
-                        name
-                    } else {
-                        errors.push(Error::new("local branch name is not valid utf-8"));
-                        continue;
-                    },
+                    Ok(name) => {
+                        if let Some(name) = name {
+                            name
+                        } else {
+                            errors.push(Error::new("local branch name is not valid utf-8"));
+                            continue;
+                        }
+                    }
                     Err(e) => {
                         errors.push(Error::new(&format!(
                             "failed to get name of local branch ({})",
                             e
                         )));
                         continue;
-                    },
+                    }
                 };
                 if local.get().target().is_none() {
                     errors.push(Error::new(&format!(
@@ -318,22 +320,24 @@ impl<'a> TrackingBranches<'a> {
                     continue;
                 };
                 let upstream_name = match upstream.name() {
-                    Ok(name) => if let Some(name) = name {
-                        name
-                    } else {
-                        errors.push(Error::new(&format!(
-                            "upstream branch name for local branch '{}' is not valid utf-8",
-                            local_name
-                        )));
-                        continue;
-                    },
+                    Ok(name) => {
+                        if let Some(name) = name {
+                            name
+                        } else {
+                            errors.push(Error::new(&format!(
+                                "upstream branch name for local branch '{}' is not valid utf-8",
+                                local_name
+                            )));
+                            continue;
+                        }
+                    }
                     Err(e) => {
                         errors.push(Error::new(&format!(
                             "failed to get name of upstream branch for local branch {} ({})",
                             local_name, e
                         )));
                         continue;
-                    },
+                    }
                 };
                 if upstream.get().target().is_none() {
                     errors.push(Error::new(&format!(
