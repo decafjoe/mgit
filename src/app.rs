@@ -230,10 +230,10 @@ fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
                             "could not get parent of relative_to ({})",
                             path
                         )))
-                    },
+                    }
                 }
             }
-        },
+        }
         None => match env::current_dir() {
             Ok(buf) => buf,
             Err(e) => return Err(Error::new(&format!("could not get cwd ({})", e))),
@@ -679,7 +679,7 @@ impl Config {
                     "failed to resolve config path",
                     Some(e.message()),
                 )]
-            },
+            }
         };
 
         let mut rv = Vec::new();
@@ -698,7 +698,7 @@ impl Config {
                             Some(&format!("{}", e)),
                         ));
                         continue;
-                    },
+                    }
                 };
                 if entry.path().is_file() {
                     if let Some(extension) = entry.path().extension() {
@@ -744,7 +744,7 @@ impl Config {
                         Some(&format!("{}", e)),
                     ));
                     continue;
-                },
+                }
             };
             let mut s = String::new();
             if let Err(e) = f.read_to_string(&mut s) {
@@ -766,7 +766,7 @@ impl Config {
                         Some(&format!("{}", e)),
                     ));
                     continue;
-                },
+                }
             };
             for (section, settings) in &ini {
                 let repo_path = if let Some(ref path) = *section {
@@ -784,7 +784,7 @@ impl Config {
                             Some(e.message()),
                         ));
                         continue;
-                    },
+                    }
                 };
                 let full_path_str = if let Some(s) = full_path.to_str() {
                     s

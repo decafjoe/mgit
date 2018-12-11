@@ -73,18 +73,22 @@ pub fn run(invocation: &Invocation) {
             match repo.name() {
                 Some(name) => {
                     info.insert("name", name);
-                },
-                None => if verbose {
-                    info.insert("name", name_default);
-                },
+                }
+                None => {
+                    if verbose {
+                        info.insert("name", name_default);
+                    }
+                }
             }
             match repo.symbol() {
                 Some(symbol) => {
                     info.insert("symbol", symbol);
-                },
-                None => if verbose {
-                    info.insert("symbol", symbol_default);
-                },
+                }
+                None => {
+                    if verbose {
+                        info.insert("symbol", symbol_default);
+                    }
+                }
             }
             if verbose || !tags_vec.is_empty() {
                 info.insert("tags", &tags);

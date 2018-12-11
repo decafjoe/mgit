@@ -89,7 +89,9 @@ pub fn run(invocation: &Invocation) {
                         .iter()
                         .filter(|status_entry| {
                             status_entry.status().intersects(
-                                Status::INDEX_DELETED | Status::INDEX_MODIFIED | Status::INDEX_NEW
+                                Status::INDEX_DELETED
+                                    | Status::INDEX_MODIFIED
+                                    | Status::INDEX_NEW
                                     | Status::INDEX_RENAMED
                                     | Status::INDEX_TYPECHANGE,
                             )
@@ -104,7 +106,9 @@ pub fn run(invocation: &Invocation) {
                         .iter()
                         .filter(|status_entry| {
                             status_entry.status().intersects(
-                                Status::WT_DELETED | Status::WT_MODIFIED | Status::WT_RENAMED
+                                Status::WT_DELETED
+                                    | Status::WT_MODIFIED
+                                    | Status::WT_RENAMED
                                     | Status::WT_TYPECHANGE,
                             )
                         })
@@ -128,11 +132,12 @@ pub fn run(invocation: &Invocation) {
                 }
 
                 match TrackingBranches::for_repository(&git) {
-                    Ok(branches) => for branch in branches {
-                        let local_name = branch.local_name();
-                        let upstream_name = branch.upstream_name();
-                        let (ahead, behind) =
-                            match git.graph_ahead_behind(branch.local_oid(), branch.upstream_oid())
+                    Ok(branches) => {
+                        for branch in branches {
+                            let local_name = branch.local_name();
+                            let upstream_name = branch.upstream_name();
+                            let (ahead, behind) = match git
+                                .graph_ahead_behind(branch.local_oid(), branch.upstream_oid())
                             {
                                 Ok((ahead, behind)) => (ahead, behind),
                                 Err(e) => {
@@ -146,52 +151,55 @@ pub fn run(invocation: &Invocation) {
                                         ),
                                     ));
                                     continue;
-                                },
+                                }
                             };
-                        if ahead > 0 && behind > 0 {
+                            if ahead > 0 && behind > 0 {
+                                summary.push_note(Note::new(
+                                    BRANCH_STATUS_GROUP,
+                                    Kind::Failure,
+                                    &format!(
+                                        "{} has diverged from {} ({} and {} commits)",
+                                        local_name, upstream_name, ahead, behind
+                                    ),
+                                ));
+                            } else if ahead > 0 {
+                                let s = if ahead == 1 { "" } else { "s" };
+                                summary.push_note(Note::new(
+                                    BRANCH_STATUS_GROUP,
+                                    Kind::Warning,
+                                    &format!(
+                                        "{} is ahead of {} by {} commit{}",
+                                        local_name, upstream_name, ahead, s
+                                    ),
+                                ));
+                            } else if behind > 0 {
+                                let s = if ahead == 1 { "" } else { "s" };
+                                summary.push_note(Note::new(
+                                    BRANCH_STATUS_GROUP,
+                                    Kind::Failure,
+                                    &format!(
+                                        "{} is behind {} by {} commit{}",
+                                        local_name, upstream_name, behind, s
+                                    ),
+                                ));
+                            } else {
+                                summary.push_note(Note::new(
+                                    BRANCH_STATUS_GROUP,
+                                    Kind::None,
+                                    &format!("{} is up to date with {}", local_name, upstream_name),
+                                ));
+                            }
+                        }
+                    }
+                    Err(errors) => {
+                        for error in errors {
                             summary.push_note(Note::new(
-                                BRANCH_STATUS_GROUP,
+                                BRANCH_FAILURE_GROUP,
                                 Kind::Failure,
-                                &format!(
-                                    "{} has diverged from {} ({} and {} commits)",
-                                    local_name, upstream_name, ahead, behind
-                                ),
-                            ));
-                        } else if ahead > 0 {
-                            let s = if ahead == 1 { "" } else { "s" };
-                            summary.push_note(Note::new(
-                                BRANCH_STATUS_GROUP,
-                                Kind::Warning,
-                                &format!(
-                                    "{} is ahead of {} by {} commit{}",
-                                    local_name, upstream_name, ahead, s
-                                ),
-                            ));
-                        } else if behind > 0 {
-                            let s = if ahead == 1 { "" } else { "s" };
-                            summary.push_note(Note::new(
-                                BRANCH_STATUS_GROUP,
-                                Kind::Failure,
-                                &format!(
-                                    "{} is behind {} by {} commit{}",
-                                    local_name, upstream_name, behind, s
-                                ),
-                            ));
-                        } else {
-                            summary.push_note(Note::new(
-                                BRANCH_STATUS_GROUP,
-                                Kind::None,
-                                &format!("{} is up to date with {}", local_name, upstream_name),
+                                error.message(),
                             ));
                         }
-                    },
-                    Err(errors) => for error in errors {
-                        summary.push_note(Note::new(
-                            BRANCH_FAILURE_GROUP,
-                            Kind::Failure,
-                            error.message(),
-                        ));
-                    },
+                    }
                 }
 
                 cache.insert(repo, summary);
