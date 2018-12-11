@@ -203,7 +203,7 @@ pub fn run(invocation: &Invocation) {
                     scope
                         .builder()
                         .name(format!("{}:{}", repo.name_or_default(), name))
-                        .spawn(move || {
+                        .spawn(move |_| {
                             let summary = fetch_and_ff(repo, &name);
                             tx.send((repo, name, summary))
                                 .expect("failed to transmit results to main thread");
@@ -217,7 +217,8 @@ pub fn run(invocation: &Invocation) {
                 // Rest for a sec before checking all the things again.
                 thread::sleep(t);
             }
-        });
+        })
+        .expect("one or more threads panicked");
         // Tell the UI we are done fetching.
         ui.cleanup();
     } // end scope of `stdout`, terminal state should be reset
