@@ -27,10 +27,10 @@ help :
 
 
 fmt :
-	cd $(ROOT); $(CARGO) +nightly fmt -- --write-mode=diff
+	cd $(ROOT); $(CARGO) fmt -- --check
 
 lint :
-	cd $(ROOT); $(CARGO) +nightly clippy -- -Wclippy-pedantic
+	cd $(ROOT); $(CARGO) clippy -- -Wclippy-pedantic
 
 test :
 	cd $(ROOT); $(CARGO) test
