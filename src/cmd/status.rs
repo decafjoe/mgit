@@ -76,8 +76,7 @@ pub fn run(invocation: &Invocation) {
                 status_options.recurse_untracked_dirs(true);
 
                 if let Ok(statuses) = git.statuses(Some(&mut status_options)) {
-                    /// Returns a new `Note` for the given status
-                    /// result.
+                    /// Returns a new `Note` for the given status result.
                     fn note_for_status(group: usize, count: usize, description: &str) -> Note {
                         let kind = if count > 0 { Kind::Failure } else { Kind::None };
                         let files = if count == 1 { "file is" } else { "files are" };

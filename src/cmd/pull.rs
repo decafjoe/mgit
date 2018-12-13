@@ -187,11 +187,10 @@ pub fn run(invocation: &Invocation) {
         // and this is, like, incredibly clean-looking and appears to work exactly as
         // expected.
         crossbeam::scope(|scope| {
-            // Loop until all the current threads are complete and we have nothing left to
-            // do.
+            // Loop until all the current threads are complete and we have nothing left to do.
             while active > 0 || !remotes.is_empty() {
+                // Merge the completed `Summary`s into the master `Summary`.
                 for (repo, name, summary) in rx.try_iter() {
-                    // Merge the remote's `Summary` into the master `Summary`.
                     results
                         .get_mut(repo)
                         .expect("failed to get summary for repo")
@@ -912,8 +911,7 @@ impl<'a, W: Write> UI<'a, W> {
 
     /// Returns the appropriate style for the given `state`.
     ///
-    /// **This is an internal method and should not be called outside the
-    /// impl.**
+    /// **This is an internal method and should not be called outside the impl.**
     fn style_for_state(&self, state: &State) -> Style {
         match *state {
             State::Pending => Color::Blue.normal(),
