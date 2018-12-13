@@ -2,6 +2,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::{stdout, Write},
+    os::unix::process::CommandExt,
     process::Command,
     thread,
     time::{Duration, Instant},
@@ -10,8 +11,9 @@ use std::{
 use ansi_term::{Color, Style};
 use clap::Arg;
 use crossbeam;
-use crossbeam_channel;
+use crossbeam_channel::{self, Receiver, Sender};
 use git2::{ObjectType, ResetType, StatusOptions, StatusShow};
+use libc;
 use termion::{
     self, clear, cursor,
     event::Key,
@@ -47,7 +49,7 @@ const BRANCH_STATUS_GROUP: usize = 101;
 
 /// Number of times per second to update status of operations, as well
 /// as the UI showing the status.
-const UPDATE_FREQUENCY: u64 = 10;
+const UPDATE_FREQUENCY: u64 = 100;
 
 /// Number of milliseconds after which a terminal resize is considered
 /// "settled."
@@ -183,6 +185,13 @@ pub fn run(invocation: &Invocation) {
         // fetch thread is complete, and it will start a new fetch thread.
         let (results_tx, results_rx) = crossbeam_channel::unbounded();
 
+        // Handles to the senders whose receiving ends are in the threads
+        // running the `git fetch` subprocesses. If the user wants to hard
+        // cancel the fetches, a single message is sent across each channel from
+        // the main thread to the child threads, which lets them know to
+        // terminate.
+        let mut term_txs: Vec<Sender<bool>> = Vec::new();
+
         // Use crossbeam magic (?) because Rust threading primitives are above my head
         // and this is, like, incredibly clean-looking and appears to work exactly as
         // expected.
@@ -213,7 +222,13 @@ pub fn run(invocation: &Invocation) {
                         .any(|key| key.expect("failed to parse keyboard input") == Key::Ctrl('c'))
                 {
                     if canceled {
-                        // TODO(jjoyce): kill child subprocesses
+                        for tx in &term_txs {
+                            // The `term_txs` vec has references to all threads that have been
+                            // started. If some have completed, the rx sides will be dead and
+                            // sending a message will error out. This is an expected behavior, so
+                            // ignore any errors.
+                            let _ = tx.send(true);
+                        }
                         canceled_hard = true;
                     } else {
                         canceled = true;
@@ -230,12 +245,15 @@ pub fn run(invocation: &Invocation) {
                     // Tell the UI we have started the fetch.
                     ui.update_state(repo, &name, State::Fetching);
                     let results_tx = results_tx.clone();
+                    let (term_tx, term_rx) = crossbeam_channel::bounded(1);
+                    term_txs.push(term_tx);
                     scope
                         .builder()
                         .name(format!("{}:{}", repo.name_or_default(), name))
                         .spawn(move |_| {
-                            let summary = fetch_and_ff(repo, &name);
-                            results_tx.send((repo, name, summary))
+                            let summary = fetch_and_ff(&term_rx, repo, &name);
+                            results_tx
+                                .send((repo, name, summary))
                                 .expect("failed to transmit results to main thread");
                         })
                         .expect("failed to spawn thread for pull operation");
@@ -348,13 +366,51 @@ fn style_for_kind(kind: &Kind) -> Style {
 /// does not handle this case). But, seriously, who's using mgit that doesn't
 /// have git installed and on the PATH? (Those sound an awful lot like famous
 /// last words.)
-fn fetch_and_ff(repo: &Repo, name: &str) -> Summary {
-    let mut summary = Summary::new();
-    let out = Command::new("git")
+#[allow(clippy::cast_possible_wrap)]
+fn fetch_and_ff(term_rx: &Receiver<bool>, repo: &Repo, name: &str) -> Summary {
+    // The `git fetch` subprocess can spawn its own subprocesses. If we need to kill `git fetch` we
+    // want to kill all its children as well. To do so, we make sure `git fetch` and its children
+    // all have the same process group id (which we make sure is different than the parent process'
+    // pgid), then use `killpg(pgid)` to kill the children without touching the parent.
+    //
+    // By default children inherit the same pgid as the parent, so setting the right pgid for the
+    // `git fetch` means its children will also have the correct value.
+    //
+    // We use `before_exec` to set the pgid for `git fetch`. Per the documentation, `before_exec`
+    // runs after the process fork, so the child will have a new, unique pid. When `setpgid(pid,
+    // pgid)` is called with a 0 for the first argument, the call applies to the calling process
+    // (our child). When pgid is 0, the pgid is set to the same value as the pid.
+    let mut child = Command::new("git")
         .args(&["fetch", name])
         .current_dir(repo.full_path())
-        .output();
-    let error = match out {
+        .before_exec(|| unsafe {
+            libc::setpgid(0, 0);
+            Ok(())
+        })
+        .spawn()
+        .expect("failed to start `git fetch` command");
+
+    // Periodically check whether the process has exited, or whether the mgit has received a
+    // sigterm (in which case the child processes are killed and an empty summary returned
+    // immediately).
+    let t = Duration::from_millis(1000 / UPDATE_FREQUENCY);
+    while None
+        == child
+            .try_wait()
+            .expect("failed to get status of child process")
+    {
+        if term_rx.try_recv().is_ok() {
+            unsafe {
+                libc::killpg(child.id() as i32, 9);
+            }
+            return Summary::new();
+        }
+        thread::sleep(t);
+    }
+
+    // Make a final blocking call (which shouldn't actually block) to get the output from the
+    // command and determine whether it completed successfully.
+    let error = match child.wait_with_output() {
         Ok(out) => {
             if out.status.success() {
                 None
@@ -373,8 +429,11 @@ fn fetch_and_ff(repo: &Repo, name: &str) -> Summary {
         }
         Err(e) => Some(format!("{}", e)),
     };
+
     let git = repo.git();
+    let mut summary = Summary::new();
     if let Some(message) = error {
+        // If the fetch failed, add the error message to the summary and bail out.
         summary.push_note(Note::new(
             FETCH_FAILURE_GROUP,
             Kind::Failure,
