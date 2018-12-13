@@ -3,7 +3,6 @@ use std::{
     collections::{HashMap, HashSet},
     io::{stdout, Write},
     process::Command,
-    sync::mpsc,
     thread,
     time::{Duration, Instant},
 };
@@ -11,6 +10,7 @@ use std::{
 use ansi_term::{Color, Style};
 use clap::Arg;
 use crossbeam;
+use crossbeam_channel;
 use git2::{ObjectType, ResetType, StatusOptions, StatusShow};
 use termion::{
     self, clear, cursor,
@@ -174,14 +174,14 @@ pub fn run(invocation: &Invocation) {
         // Turn `UPDATE_FREQUENCY` into an amount of time to sleep between updates.
         let t = Duration::from_millis(1000 / UPDATE_FREQUENCY);
 
-        // `tx` gets cloned and handed off to each fetch thread. The thread is expected
-        // to send a single message:
+        // `results_tx` gets cloned and handed off to each fetch thread. The
+        // thread is expected to send a single message:
         //
         //   (&Repo, String, Summary)
         //
-        // Once `rx` receives the message, the main loop assumes the fetch thread is
-        // complete, and it will start a new fetch thread.
-        let (tx, rx) = mpsc::channel();
+        // Once `results_rx` receives the message, the main loop assumes the
+        // fetch thread is complete, and it will start a new fetch thread.
+        let (results_tx, results_rx) = crossbeam_channel::unbounded();
 
         // Use crossbeam magic (?) because Rust threading primitives are above my head
         // and this is, like, incredibly clean-looking and appears to work exactly as
@@ -190,7 +190,7 @@ pub fn run(invocation: &Invocation) {
             // Loop until all the current threads are complete and we have nothing left to do.
             while active > 0 || !remotes.is_empty() {
                 // Merge the completed `Summary`s into the master `Summary`.
-                for (repo, name, summary) in rx.try_iter() {
+                for (repo, name, summary) in results_rx.try_iter() {
                     results
                         .get_mut(repo)
                         .expect("failed to get summary for repo")
@@ -229,13 +229,13 @@ pub fn run(invocation: &Invocation) {
                     let (repo, name) = remotes.remove(0);
                     // Tell the UI we have started the fetch.
                     ui.update_state(repo, &name, State::Fetching);
-                    let tx = tx.clone();
+                    let results_tx = results_tx.clone();
                     scope
                         .builder()
                         .name(format!("{}:{}", repo.name_or_default(), name))
                         .spawn(move |_| {
                             let summary = fetch_and_ff(repo, &name);
-                            tx.send((repo, name, summary))
+                            results_tx.send((repo, name, summary))
                                 .expect("failed to transmit results to main thread");
                         })
                         .expect("failed to spawn thread for pull operation");
