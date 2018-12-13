@@ -24,15 +24,15 @@
 //! critical.)
 extern crate ansi_term;
 #[macro_use]
-extern crate chan;
-extern crate chan_signal;
-#[macro_use]
 extern crate clap;
 extern crate crossbeam;
+#[macro_use]
+extern crate crossbeam_channel;
 extern crate git2;
 extern crate indexmap;
 extern crate ini;
 extern crate pager;
+extern crate signal_hook;
 extern crate termion;
 extern crate users;
 extern crate walkdir;
@@ -50,7 +50,7 @@ use std::{
     thread,
 };
 
-use chan_signal::Signal;
+use signal_hook::{iterator::Signals, SIGINT, SIGTERM};
 
 use app::{init, Command};
 use cmd::{config, pull, status};
@@ -82,8 +82,18 @@ fn exit(code: i32) {
 
 /// Entry point for the program.
 pub fn main() {
-    // Channel to listen to for termination signals.
-    let terminate_signal = chan_signal::notify(&[Signal::INT, Signal::TERM]);
+    // Use a separate thread to listen for SIGINT and SIGTERM, forwarding them
+    // to the main thread via a channel.
+    let term_signals =
+        Signals::new(&[SIGINT, SIGTERM]).expect("failed to create the signals iterator");
+    let (term_tx, term_rx) = crossbeam_channel::bounded(0);
+    thread::spawn(move || {
+        for signal in term_signals.forever() {
+            term_tx
+                .send(signal)
+                .expect("failed to send signal over channel");
+        }
+    });
 
     // Two copies of the refcell that hold the "received terminate signal" state.
     // One copy for the invocation instance, which is moved to a separate thread,
@@ -94,14 +104,14 @@ pub fn main() {
 
     // Initialize the application, allowing a term signal to immediately exit the
     // process.
-    let (init_done_tx, init_done) = chan::sync(0);
+    let (init_tx, init_rx) = crossbeam_channel::bounded(0);
     let init_guard = thread::Builder::new()
         .name("init".to_string())
-        .spawn(move || init(init_done_tx, exit, init_terminate_arc, &COMMANDS))
+        .spawn(move || init(init_tx, exit, init_terminate_arc, &COMMANDS))
         .expect("failed to spawn thread for initialization");
-    chan_select! {
-        init_done.recv() => {},
-        terminate_signal.recv() -> _ => {
+    select! {
+        recv(init_rx) -> _ => {},
+        recv(term_rx) -> _ => {
             eprintln!();
             exit(1);
         },
@@ -114,28 +124,26 @@ pub fn main() {
 
     // Run the subcommand in a separate thread, keeping the main thread free to
     // listen for terminate signals.
-    let (run_done_tx, run_done) = chan::sync(0);
+    let (run_tx, run_rx) = crossbeam_channel::bounded(0);
     thread::Builder::new()
         .name("command".to_string())
-        .spawn(move || invocation.command().run(run_done_tx, &invocation))
+        .spawn(move || invocation.command().run(run_tx, &invocation))
         .expect("failed to spawn thread for running command");
 
     // If we get a terminate signal, set the "should terminate" flag. The
     // subcommand can check this via the `Invocation.should_terminate()`
     // method. When the flag is set, the subcommand should clean up and exit as
     // soon as it can.
-    chan_select! {
-        run_done.recv() => { exit(0); },
-        terminate_signal.recv() -> _ => {
-            terminate_arc.store(true, Ordering::Relaxed);
-        },
+    select! {
+        recv(run_rx) -> _ => { exit(0); },
+        recv(term_rx) -> _ => { terminate_arc.store(true, Ordering::Relaxed); },
     }
 
     // If we get a second terminate signal before the command has cleaned up and
     // exited, hard bail out of the process.
-    chan_select! {
-        run_done.recv() => {},
-        terminate_signal.recv() => { eprintln!(); },
+    select! {
+        recv(run_rx) -> _ => {},
+        recv(term_rx) -> _ => { eprintln!(); },
     }
     exit(1);
 }

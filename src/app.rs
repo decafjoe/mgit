@@ -15,8 +15,8 @@ use std::{
 };
 
 use ansi_term::{Color, Style};
-use chan::Sender;
 use clap::{App, Arg, ArgMatches, SubCommand};
+use crossbeam_channel::Sender;
 use git2::Repository;
 use ini::Ini;
 use pager::Pager;
