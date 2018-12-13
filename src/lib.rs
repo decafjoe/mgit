@@ -45,7 +45,7 @@ mod ui;
 use std::{
     process,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicUsize, Ordering},
         Arc,
     },
     thread,
@@ -96,19 +96,19 @@ pub fn main() {
         }
     });
 
-    // Two copies of the refcell that hold the "received terminate signal" state.
-    // One copy for the invocation instance, which is moved to a separate thread,
-    // and one for the main thread, which uses it to pass the signal through the
-    // invocation to the subcommand thread.
-    let terminate_arc = Arc::new(AtomicBool::new(false));
-    let init_terminate_arc = Arc::clone(&terminate_arc);
+    // Make two copies of a refcell that hold the count of sigterms received.
+    // One copy is for the invocation instance, which is moved to a separate
+    // thread, and one is for the main thread, which uses it to capture signals
+    // and pass the count through the invocation to the subcommand thread.
+    let term_arc_main = Arc::new(AtomicUsize::new(0));
+    let term_arc_invocation = Arc::clone(&term_arc_main);
 
     // Initialize the application, allowing a term signal to immediately exit the
     // process.
     let (init_tx, init_rx) = crossbeam_channel::bounded(0);
     let init_guard = thread::Builder::new()
         .name("init".to_string())
-        .spawn(move || init(init_tx, exit, init_terminate_arc, &COMMANDS))
+        .spawn(move || init(init_tx, term_arc_invocation, exit, &COMMANDS))
         .expect("failed to spawn thread for initialization");
     select! {
         recv(init_rx) -> _ => {},
@@ -131,20 +131,12 @@ pub fn main() {
         .spawn(move || invocation.command().run(run_tx, &invocation))
         .expect("failed to spawn thread for running command");
 
-    // If we get a terminate signal, set the "should terminate" flag. The
-    // subcommand can check this via the `Invocation.should_terminate()`
-    // method. When the flag is set, the subcommand should clean up and exit as
-    // soon as it can.
-    select! {
-        recv(run_rx) -> _ => { exit(0); },
-        recv(term_rx) -> _ => { terminate_arc.store(true, Ordering::Relaxed); },
+    // Loop forever, processing sigterms while waiting for the command to
+    // complete.
+    loop {
+        select! {
+            recv(run_rx) -> _ => { exit(0); },
+            recv(term_rx) -> _ => { term_arc_main.fetch_add(1, Ordering::Relaxed); },
+        }
     }
-
-    // If we get a second terminate signal before the command has cleaned up and
-    // exited, hard bail out of the process.
-    select! {
-        recv(run_rx) -> _ => {},
-        recv(term_rx) -> _ => { eprintln!(); },
-    }
-    exit(1);
 }

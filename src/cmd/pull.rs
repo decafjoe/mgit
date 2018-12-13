@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::{stdout, Write},
     os::unix::process::CommandExt,
-    process::Command,
+    process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
 };
@@ -118,15 +118,13 @@ pub fn run(invocation: &Invocation) {
 
     // Iterator on which we check `next()` for Ctrl-c from the user. This is required because the
     // terminal does not translate keyboard input into interrupts when it is in raw mode. So we
-    // watch for that key chord in addition to checking `should_terminate()` (which can still be
-    // triggered by a signal from outside this program).
+    // watch for that key chord in addition to checking `sigterms_received()`, which can still be
+    // triggered by signals from outside this program.
     let mut stdin = termion::async_stdin().keys();
 
-    // Set to true if we get a sigterm or see Ctrl-c from the user.
-    let mut canceled = false;
-
-    // Set to true if we get a second sigterm or Ctrl-c.
-    let mut canceled_hard = false;
+    // Represents the termination state of the operation. See the documentation
+    // on the `TerminationState` enum for more information.
+    let mut termination_state = TerminationState::None;
 
     // The block controls the scope of `stdout`. We put the terminal into raw mode
     // to display the in-progress UI. When `stdout` goes out of scope, the terminal
@@ -215,29 +213,37 @@ pub fn run(invocation: &Invocation) {
                     // Free up a thread for use.
                     active -= 1;
                 }
-                // Check whether we should terminate and if so, take the appropriate action based on
-                // whether it's the first or second sigterm the program has received.
-                if invocation.should_terminate()
-                    || stdin
-                        .any(|key| key.expect("failed to parse keyboard input") == Key::Ctrl('c'))
-                {
-                    if canceled {
-                        for tx in &term_txs {
-                            // The `term_txs` vec has references to all threads that have been
-                            // started. If some have completed, the rx sides will be dead and
-                            // sending a message will error out. This is an expected behavior, so
-                            // ignore any errors.
-                            let _ = tx.send(true);
-                        }
-                        canceled_hard = true;
-                    } else {
-                        canceled = true;
-                        while !remotes.is_empty() {
-                            let (repo, name) = remotes.remove(0);
-                            ui.update_state(repo, &name, State::Canceled);
-                        }
-                        ui.cancel(&results);
+                // Process any keystrokes, looking for ctrl-c.
+                while let Some(key) = stdin.next() {
+                    if key.expect("failed to parse keyboard input") == Key::Ctrl('c') {
+                        invocation.sigterm_received();
                     }
+                }
+                // Move to "soft" termination state if we're currently running
+                // normally but the user has asked for termination.
+                if termination_state == TerminationState::None && invocation.sigterms_received() > 0
+                {
+                    // Drain the pending fetches, setting their state to canceled.
+                    while !remotes.is_empty() {
+                        let (repo, name) = remotes.remove(0);
+                        ui.update_state(repo, &name, State::Canceled);
+                    }
+                    ui.cancel(&results);
+                    termination_state = TerminationState::Soft;
+                }
+                // Move to "hard" termination state if we're currently in "soft"
+                // termination state and we have received two or more sigterms.
+                if termination_state == TerminationState::Soft && invocation.sigterms_received() > 1
+                {
+                    for tx in &term_txs {
+                        // The `term_txs` vec has references to all threads that
+                        // have been started. If some have completed, those rx
+                        // sides will be dead and sending a message will error
+                        // out. This is an expected behavior, so ignore any
+                        // errors.
+                        let _ = tx.send(true);
+                    }
+                    termination_state = TerminationState::Hard;
                 }
                 // If there are available threads, and fetches to be done – start them up.
                 while active < concurrent && !remotes.is_empty() {
@@ -271,9 +277,10 @@ pub fn run(invocation: &Invocation) {
         ui.cleanup();
     } // end scope of `stdout`, terminal state should be reset
 
-    // If the user canceled twice, assume it signals the intent "get me the hell out of here as
-    // quickly as possible" and don't bother them with a summary.
-    if canceled_hard {
+    // If the user sent two sigterms, assume it signals the intent "get me the
+    // hell out of here as quickly as possible" -- don't bother them with a
+    // summary.
+    if termination_state == TerminationState::Hard {
         println!();
         return;
     }
@@ -308,6 +315,19 @@ pub fn run(invocation: &Invocation) {
         }
     }
     println!();
+}
+
+// ----- TerminationState ---------------------------------------------------------------------------------------------
+
+#[derive(PartialEq)]
+enum TerminationState {
+    /// Not termination; running normally.
+    None,
+    /// Soft termination; allow running fetches to complete, do not start any
+    /// new ones.
+    Soft,
+    /// Hard termination; kill all fetch processes and exit.
+    Hard,
 }
 
 // ----- style_for_kind -----------------------------------------------------------------------------------------------
@@ -383,6 +403,8 @@ fn fetch_and_ff(term_rx: &Receiver<bool>, repo: &Repo, name: &str) -> Summary {
     let mut child = Command::new("git")
         .args(&["fetch", name])
         .current_dir(repo.full_path())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .before_exec(|| unsafe {
             libc::setpgid(0, 0);
             Ok(())

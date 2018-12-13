@@ -9,7 +9,7 @@ use std::{
     iter::Iterator,
     path::{Path, PathBuf, MAIN_SEPARATOR},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -38,8 +38,8 @@ const WARNING_ARG: &str = "WARNING";
 /// a reference to the subcommand that was invoked by the user.
 pub fn init<'a>(
     _: Sender<()>,
+    sigterm_arc: Arc<AtomicUsize>,
     exit: fn(i32),
-    terminate: Arc<AtomicBool>,
     commands: &'a [Command<'a>],
 ) -> Invocation<'a> {
     // Configure the top-level app instance.
@@ -132,7 +132,7 @@ pub fn init<'a>(
     // newly-created invocation instance to the caller.
     for command in commands {
         if let Some(m) = matches.subcommand_matches(command.name) {
-            return Invocation::new(terminate, control, config, command, m);
+            return Invocation::new(sigterm_arc, control, config, command, m);
         }
     }
 
@@ -1021,15 +1021,14 @@ pub struct Invocation<'a> {
     command: &'a Command<'a>,
     /// `ArgMatches` instance, for the subcommand arguments.
     matches: ArgMatches<'a>,
-    /// Holds the reference to the refcell containing the "should terminate"
-    /// flag.
-    terminate: Arc<AtomicBool>,
+    /// Number of times the program has receieved a signal to terminate.
+    sigterms_received: Arc<AtomicUsize>,
 }
 
 impl<'a> Invocation<'a> {
     /// Creates and returns a new invocation instance.
     fn new(
-        terminate: Arc<AtomicBool>,
+        sigterm_arc: Arc<AtomicUsize>,
         control: Control,
         config: Config,
         command: &'a Command,
@@ -1040,7 +1039,7 @@ impl<'a> Invocation<'a> {
             control,
             command,
             matches: matches.clone(),
-            terminate,
+            sigterms_received: sigterm_arc,
         }
     }
 
@@ -1059,10 +1058,14 @@ impl<'a> Invocation<'a> {
         &self.matches
     }
 
-    /// Returns `true` if termination signal has been receieved, meaning the
-    /// command should clean up and terminate as soon as possible.
-    pub fn should_terminate(&self) -> bool {
-        self.terminate.load(Ordering::Relaxed)
+    /// Increments the number of sigterms received by one.
+    pub fn sigterm_received(&self) {
+        self.sigterms_received.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Returns the number of times a termination signal has been received.
+    pub fn sigterms_received(&self) -> usize {
+        self.sigterms_received.load(Ordering::Relaxed)
     }
 
     /// Returns a `TagIter` based on the end-user arguments supplied in the
