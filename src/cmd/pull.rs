@@ -14,6 +14,8 @@ use crossbeam;
 use git2::{ObjectType, ResetType, StatusOptions, StatusShow};
 use termion::{
     self, clear, cursor,
+    event::Key,
+    input::TermRead,
     raw::{IntoRawMode, RawTerminal},
 };
 
@@ -112,6 +114,18 @@ pub fn run(invocation: &Invocation) {
     // `Summary` stored in this map.
     let mut results: Results = HashMap::new();
 
+    // Iterator on which we check `next()` for Ctrl-c from the user. This is required because the
+    // terminal does not translate keyboard input into interrupts when it is in raw mode. So we
+    // watch for that key chord in addition to checking `should_terminate()` (which can still be
+    // triggered by a signal from outside this program).
+    let mut stdin = termion::async_stdin().keys();
+
+    // Set to true if we get a sigterm or see Ctrl-c from the user.
+    let mut canceled = false;
+
+    // Set to true if we get a second sigterm or Ctrl-c.
+    let mut canceled_hard = false;
+
     // The block controls the scope of `stdout`. We put the terminal into raw mode
     // to display the in-progress UI. When `stdout` goes out of scope, the terminal
     // state is reset via the destructor.
@@ -193,6 +207,24 @@ pub fn run(invocation: &Invocation) {
                     // Free up a thread for use.
                     active -= 1;
                 }
+                // Check whether we should terminate and if so, take the appropriate action based on
+                // whether it's the first or second sigterm the program has received.
+                if invocation.should_terminate()
+                    || stdin
+                        .any(|key| key.expect("failed to parse keyboard input") == Key::Ctrl('c'))
+                {
+                    if canceled {
+                        // TODO(jjoyce): kill child subprocesses
+                        canceled_hard = true;
+                    } else {
+                        canceled = true;
+                        while !remotes.is_empty() {
+                            let (repo, name) = remotes.remove(0);
+                            ui.update_state(repo, &name, State::Canceled);
+                        }
+                        ui.cancel(&results);
+                    }
+                }
                 // If there are available threads, and fetches to be done – start them up.
                 while active < concurrent && !remotes.is_empty() {
                     let (repo, name) = remotes.remove(0);
@@ -221,6 +253,13 @@ pub fn run(invocation: &Invocation) {
         // Tell the UI we are done fetching.
         ui.cleanup();
     } // end scope of `stdout`, terminal state should be reset
+
+    // If the user canceled twice, assume it signals the intent "get me the hell out of here as
+    // quickly as possible" and don't bother them with a summary.
+    if canceled_hard {
+        println!();
+        return;
+    }
 
     invocation.start_pager();
     let header = Style::new().bold().underline();
@@ -496,6 +535,8 @@ fn fetch_and_ff(repo: &Repo, name: &str) -> Summary {
 enum State {
     /// Fetch has not yet started.
     Pending,
+    /// Fetch has been canceled by the user.
+    Canceled,
     /// Fetch is in progress.
     Fetching,
     /// Fetch was successful, no tracking branches were ahead or behind.
@@ -521,6 +562,8 @@ struct UI<'a, W: 'a + Write> {
     /// Queue of updates to be made next time `process_updates` is called.
     /// Format is `(<repo>, <remote-name>, <state>)`.
     updates: Vec<(&'a Repo, String, State)>,
+    /// Indicates whether the user has terminated the program.
+    canceled: bool,
     /// `RawTerminal` instance on which all drawing commands are done.
     t: &'a mut RawTerminal<W>,
     /// Width and height of the drawn UI.
@@ -557,6 +600,7 @@ impl<'a, W: Write> UI<'a, W> {
         Self {
             state: HashMap::new(),
             updates: Vec::new(),
+            canceled: false,
             t: terminal,
             drawn: (0, 0),
             debounce: None,
@@ -600,6 +644,16 @@ impl<'a, W: Write> UI<'a, W> {
         } else if w != drawn_w || h != drawn_h {
             self.debounce = debounce;
         } else {
+            self.process_updates(results);
+        }
+    }
+
+    /// Tells the user interface that the program is terminating.
+    fn cancel(&mut self, results: &Results) {
+        if !self.canceled {
+            self.canceled = true;
+            let (w, h) = termion::terminal_size().expect("failed to get terminal size");
+            self.draw(w, h, results);
             self.process_updates(results);
         }
     }
@@ -648,31 +702,41 @@ impl<'a, W: Write> UI<'a, W> {
 
             // If number of repos is more than the number of lines we have to display them,
             // overflow_h contains the number of repos "past the bottom" of the terminal
-            // window.
-            let overflow_h = if h_usize < repos.len() {
-                repos.len() - h_usize
+            // window. Count the "cancelling..." message as a repo since it takes up a line
+            // of output.
+            let mut rows_needed = repos.len();
+            if self.canceled {
+                rows_needed += 1;
+            }
+            let overflow_h = if h_usize < rows_needed {
+                rows_needed - h_usize
             } else {
                 0
             };
 
+            let mut y: u16 = 0;
             for (i, repo) in repos.iter().enumerate() {
                 // 1-based "row" we're working on (termion is 1-based)
-                let y = (i as u16) + 1;
+                y = (i as u16) + 1;
 
                 if overflow_h > 0 && y == h {
-                    // We are drawing the last line, and we have more repos than we can show. Tell
-                    // the user how many are not displayed (which is overflow + 1, because we are
-                    // also not displaying *this* repo).
-                    let mut s = format!("\u{2026}{} more not shown", overflow_h + 1);
-                    // Our string might be longer than the available width. If so, truncate it and
-                    // add an ellipsis at the end.
-                    if s.len() > w_usize {
-                        s.truncate(w_usize - 1);
-                        s.push_str("\u{2026}");
+                    // This is the last line available in the terminal. If we are canceled, break
+                    // the loop and allow the code below to use the last line to show the
+                    // "cancelling..." message. Otherwise, use the last line to tell the user how
+                    // many repositories are not displayed.
+                    if !self.canceled {
+                        // Number not displayed is overflow + 1, because we are also not displaying
+                        // *this* repo.
+                        let mut message = format!("\u{2026}{} more not shown", overflow_h + 1);
+                        // Our message might be longer than the available width. If so, truncate it
+                        // and add an ellipsis at the end.
+                        if message.len() > w_usize {
+                            message.truncate(w_usize - 1);
+                            message.push_str("\u{2026}");
+                        }
+                        write!(self.t, "{}{}", cursor::Goto(1, y), message)
+                            .expect("failed to write content to the terminal");
                     }
-                    write!(self.t, "{}{}", cursor::Goto(1, y), s)
-                        .expect("failed to write content to the terminal");
-                    // Bail, since we're done drawing.
                     break;
                 }
 
@@ -792,6 +856,23 @@ impl<'a, W: Write> UI<'a, W> {
                 write!(self.t, "{}{}", cursor::Goto(1, y), line)
                     .expect("failed to write content to the terminal");
             }
+
+            if self.canceled {
+                let mut message = "pending fetches canceled; allowing in-flight fetches to finish \
+                                   (hit Ctrl-c again to terminate unsafely)"
+                    .to_string();
+                if message.len() > w_usize {
+                    message.truncate(w_usize - 1);
+                    message.push_str("\u{2026}");
+                }
+                write!(
+                    self.t,
+                    "{}{}",
+                    cursor::Goto(1, y + 1),
+                    Color::Red.bold().paint(message)
+                )
+                .expect("failed to write content to the terminal");
+            }
         }
         self.drawn = (w, h);
         self.process_updates(results);
@@ -836,6 +917,7 @@ impl<'a, W: Write> UI<'a, W> {
     fn style_for_state(&self, state: &State) -> Style {
         match *state {
             State::Pending => Color::Blue.normal(),
+            State::Canceled => Style::new().dimmed(),
             State::Fetching => Color::Cyan.normal(),
             State::NoChange => Style::new(),
             State::Success => Color::Green.normal(),
