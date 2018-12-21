@@ -33,8 +33,8 @@ const CONFIG_ARG: &str = "CONFIG";
 const WARNING_ARG: &str = "WARNING";
 
 /// Initializes the application, attaches subcommands, parses user input, reads
-/// configuration, populates the invocation instance and returns it along with
-/// a reference to the subcommand that was invoked by the user.
+/// configuration, populates the invocation instance and returns it along with a
+/// reference to the subcommand that was invoked by the user.
 pub fn init<'a>(
     _: Sender<()>,
     sigterm_arc: Arc<AtomicUsize>,
@@ -121,8 +121,8 @@ pub fn init<'a>(
         }
     }
 
-    // Check that we actually got some repos. If not, something likely went
-    // seriously wrong somewhere. In any case, mgit can't do anything useful.
+    // Check that we actually got some repos. If not, something likely went seriously
+    // wrong somewhere. In any case, mgit can't do anything useful.
     if config.repos().len() == 0 {
         control.fatal("no repositories configured");
     }
@@ -139,7 +139,7 @@ pub fn init<'a>(
     panic!("unreachable");
 }
 
-// ----- Command ------------------------------------------------------------------------------------------------------
+// ----- Command --------------------------------------------------------------
 
 /// Convenience wrapper around the configuration that makes up a "command."
 pub struct Command<'a> {
@@ -147,13 +147,12 @@ pub struct Command<'a> {
     pub name: &'a str,
     /// Short one-line description of the command.
     pub about: &'a str,
-    /// Specifies how to handle SIGINT/SIGTERM. If `true`, mgit calls
-    /// `exit(1)` when it receives a sigterm, expecting that the command has not
-    /// spawned any child processes and will not leave any repos in a broken
-    /// state if suddenly killed. If `false`, mgit increments a counter (see
-    /// `Invocation.sigterms_received()`) and expects the command to check the
-    /// invocation and gracefully finish what it's doing when a sigterm has been
-    /// received.
+    /// Specifies how to handle SIGINT/SIGTERM. If `true`, mgit calls `exit(1)` when it
+    /// receives a sigterm, expecting that the command has not spawned any child
+    /// processes and will not leave any repos in a broken state if suddenly killed. If
+    /// `false`, mgit increments a counter (see `Invocation.sigterms_received()`) and
+    /// expects the command to check the invocation and gracefully finish what it's
+    /// doing when a sigterm has been received.
     pub exit_on_sigterm: bool,
     /// Vec of clap arguments for the command.
     pub args: fn() -> Vec<Arg<'a, 'a>>,
@@ -184,7 +183,7 @@ impl<'a> Debug for Command<'a> {
     }
 }
 
-// ----- Error --------------------------------------------------------------------------------------------------------
+// ----- Error ----------------------------------------------------------------
 
 /// Represents a basic error.
 pub struct Error {
@@ -206,26 +205,26 @@ impl Error {
     }
 }
 
-// ----- resolve_path -------------------------------------------------------------------------------------------------
+// ----- resolve_path ---------------------------------------------------------
 
 /// Resolves the given `path`.
 ///
-/// If the path starts with `~`, this tries to resolve it to a user home
-/// directory (or a subdirectory thereof).
+/// If the path starts with `~`, this tries to resolve it to a user home directory
+/// (or a subdirectory thereof).
 ///
 /// If the path starts with the system `MAIN_SEPARATOR`, it's assumed to be
 /// absolute and is left unchanged.
 ///
-/// Otherwise, the path is assumed to be relative to `rel`. If `rel` does not
-/// have a value (i.e. is `None`) then the current working directory is used.
+/// Otherwise, the path is assumed to be relative to `rel`. If `rel` does not have
+/// a value (i.e. is `None`) then the current working directory is used.
 ///
 /// Once the path has been resolved per the above, it is canonicalized using
 /// `std::fs::canonicalize` and finally returned.
 fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
     let mut relative_to = match rel {
         Some(path) => {
-            // Caller passed relative_to. If a directory, return as-is. Otherwise, figure
-            // out the directory containing the path and return that.
+            // Caller passed relative_to. If a directory, return as-is. Otherwise, figure out
+            // the directory containing the path and return that.
             let buf = PathBuf::from(path);
             if buf.is_dir() {
                 buf
@@ -298,7 +297,7 @@ fn resolve_path(path: &str, rel: Option<&str>) -> Result<PathBuf, Error> {
     }
 }
 
-// ----- ConfigError --------------------------------------------------------------------------------------------------
+// ----- ConfigError ----------------------------------------------------------
 
 /// Represents an error encountered when reading configuration.
 struct ConfigError {
@@ -350,8 +349,7 @@ impl ConfigError {
         &self.message
     }
 
-    /// Returns the path of the associated repository, if relevant for this
-    /// error.
+    /// Returns the path of the associated repository, if relevant for this error.
     fn repo_path(&self) -> Option<&str> {
         if let Some(ref path) = self.repo_path {
             Some(path)
@@ -361,7 +359,7 @@ impl ConfigError {
     }
 }
 
-// ----- Repo ---------------------------------------------------------------------------------------------------------
+// ----- Repo -----------------------------------------------------------------
 
 /// Symbol to use if not configured by end user.
 const DEFAULT_SYMBOL: &str = "\u{2022}";
@@ -376,8 +374,8 @@ pub struct Repo {
     full_path: String,
     /// Optional human-friendly name for the repo.
     name: Option<String>,
-    /// Optional "symbol" for the repo – the character that precedes the repo
-    /// name in status listings.
+    /// Optional "symbol" for the repo – the character that precedes the repo name in
+    /// status listings.
     symbol: Option<String>,
     /// Optional tags associated with the repo.
     tags: Vec<String>,
@@ -450,8 +448,7 @@ impl Repo {
             .collect::<Vec<&str>>()
     }
 
-    /// Returns `name` if set, otherwise the default value as computed from the
-    /// `path`.
+    /// Returns `name` if set, otherwise the default value as computed from the `path`.
     pub fn name_or_default(&self) -> &str {
         if let Some(ref name) = self.name {
             name
@@ -485,8 +482,8 @@ impl Repo {
 impl PartialEq for Repo {
     /// Checks equality by comparing user-specified paths.
     ///
-    /// When obtained via the `Config` instance (the only "supported" way to
-    /// use `Repo` instances), paths are guaranteed to be unique.
+    /// When obtained via the `Config` instance (the only "supported" way to use `Repo`
+    /// instances), paths are guaranteed to be unique.
     fn eq(&self, other: &Self) -> bool {
         self.path == other.path()
     }
@@ -503,10 +500,9 @@ impl Hash for Repo {
     }
 }
 
-// ----- Field --------------------------------------------------------------------------------------------------------
+// ----- Field ----------------------------------------------------------------
 
-/// `Repo` field, used to specify what to sort by or iterate through with
-/// `Iter`.
+/// `Repo` field, used to specify what to sort by or iterate through with `Iter`.
 pub enum Field {
     /// `Repo.path()`
     Path,
@@ -514,7 +510,7 @@ pub enum Field {
     Name,
 }
 
-// ----- Iter ---------------------------------------------------------------------------------------------------------
+// ----- Iter -----------------------------------------------------------------
 
 /// Iterator over a sorted vec of `Repo` instances.
 ///
@@ -536,11 +532,10 @@ pub enum Field {
 /// }
 /// ```
 ///
-/// The underlying vector is not actually sorted until the first item is
-/// consumed.
+/// The underlying vector is not actually sorted until the first item is consumed.
 pub struct Iter<'a> {
-    /// `Vec` of `Repo` references to iterate through. Items are popped off the
-    /// front of this vec as the iterator is consumed.
+    /// `Vec` of `Repo` references to iterate through. Items are popped off the front
+    /// of this vec as the iterator is consumed.
     repos: Vec<&'a Repo>,
     /// `Field` to yield as the "key."
     iter_field: Field,
@@ -608,9 +603,9 @@ impl<'a> Iterator for Iter<'a> {
 
     /// Returns the next item in the iterator.
     ///
-    /// If this is the first item, the underlying vector is sorted. The "key"
-    /// yielded depends on the value of `iter_field`. The value is always a
-    /// reference to a `Repo`.
+    /// If this is the first item, the underlying vector is sorted. The "key" yielded
+    /// depends on the value of `iter_field`. The value is always a reference to a
+    /// `Repo`.
     fn next(&mut self) -> Option<Self::Item> {
         if !self.sorted {
             let field = &self.sort_field;
@@ -633,7 +628,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-// ----- Config -------------------------------------------------------------------------------------------------------
+// ----- Config ---------------------------------------------------------------
 
 /// Configuration key that specifies repo name.
 const NAME_KEY: &str = "name";
@@ -661,20 +656,20 @@ impl Config {
 
     /// Reads configuration at `path`, returning a list of errors encountered.
     ///
-    /// If `path` is a directory, it is recursively walked and any files with
-    /// the extension `.conf` are read into the configuration.
+    /// If `path` is a directory, it is recursively walked and any files with the
+    /// extension `.conf` are read into the configuration.
     ///
     /// # Notes
     ///
-    /// This is the method that contains all the up-front validation referenced
-    /// in the module-level docs. It's very picky.
+    /// This is the method that contains all the up-front validation referenced in the
+    /// module-level docs. It's very picky.
     ///
-    /// If there are any errors reading `path` or its children (e.g. `path`
-    /// does not exist, permissions issues) those are returned.
+    /// If there are any errors reading `path` or its children (e.g. `path` does not
+    /// exist, permissions issues) those are returned.
     ///
-    /// This will also return errors with the configuration itself (e.g. a file
-    /// defines a repository that has already been configured, repository path
-    /// does not exist or is not a git repo).
+    /// This will also return errors with the configuration itself (e.g. a file defines
+    /// a repository that has already been configured, repository path does not exist
+    /// or is not a git repo).
     fn read(&mut self, path: &str) -> Vec<ConfigError> {
         let path_str = path;
         let path = match resolve_path(path, None) {
@@ -849,7 +844,7 @@ impl Config {
     }
 }
 
-// ----- Action -------------------------------------------------------------------------------------------------------
+// ----- Action ---------------------------------------------------------------
 
 /// Represents an action to take in response to an error condition.
 #[derive(PartialEq)]
@@ -862,7 +857,7 @@ enum Action {
     Fatal,
 }
 
-// ----- Control ------------------------------------------------------------------------------------------------------
+// ----- Control --------------------------------------------------------------
 
 /// High level program control – warnings and fatal errors.
 pub struct Control {
@@ -883,15 +878,13 @@ impl Control {
 
     /// Prints error condition to stdout.
     ///
-    /// `label` indicates the type of the condition, `"warning"` or `"  fatal"`
-    /// (the labels are "manually" aligned).
+    /// `label` indicates the type of the condition, `"warning"` or `"  fatal"` (the
+    /// labels are "manually" aligned).
     ///
-    /// `color` indicates the color for the `label`. The color will be
-    /// `bold()`-ed.
+    /// `color` indicates the color for the `label`. The color will be `bold()`-ed.
     ///
-    /// `message` is the message to print to stderr. If the message contains
-    /// multiple lines, lines subsequent to the first are indented to
-    /// `label.len()` plus one.
+    /// `message` is the message to print to stderr. If the message contains multiple
+    /// lines, lines subsequent to the first are indented to `label.len()` plus one.
     fn print(&self, label: &str, color: Color, message: &str) {
         let mut empty = String::from("");
         for _ in 0..label.len() {
@@ -905,8 +898,7 @@ impl Control {
 
     /// Registers a warning with the specified `message`.
     ///
-    /// The action taken depends on the `warning_action` supplied to the
-    /// constructor:
+    /// The action taken depends on the `warning_action` supplied to the constructor:
     ///
     /// * If `Ignore`, nothing is done.
     /// * If `Print`, `message` is printed to stderr.
@@ -921,22 +913,20 @@ impl Control {
         }
     }
 
-    /// Prints `message` to stderr, then exits the process with an exit code of
-    /// `1`.
+    /// Prints `message` to stderr, then exits the process with an exit code of `1`.
     pub fn fatal(&self, message: &str) {
         self.print("  fatal", Color::Red, message);
         (self.exit)(1)
     }
 }
 
-// ----- TagIter ------------------------------------------------------------------------------------------------------
+// ----- TagIter --------------------------------------------------------------
 
 /// Weird, kind of hacky iterator to support a common UI pattern.
 ///
-/// Let me explain. All the subcommands take (zero or more) `-t/--tag`
-/// arguments. This struct works in conjunction with
-/// `Invocation.iter_tags()` to let calling code handle those arguments without
-/// doing a bunch of legwork.
+/// Let me explain. All the subcommands take (zero or more) `-t/--tag` arguments.
+/// This struct works in conjunction with `Invocation.iter_tags()` to let calling
+/// code handle those arguments without doing a bunch of legwork.
 ///
 /// ```rust,ignore
 /// for (tag, repos) in invocation.iter_tags(TAG_ARG) {
@@ -963,10 +953,9 @@ pub struct TagIter<'a> {
     /// Optional reference to a `Vec` of tags through which to iterate. `None`
     /// indicates no tag arguments were provided by the end user.
     tags: Option<Vec<&'a str>>,
-    /// Indices into `tags` for the remaining tags. Values are popped from the
-    /// front of this vec as the iterator is consumed. When `tags` is `None`,
-    /// this is a single-item vec whose value doesn't matter (see docs for
-    /// `next()`).
+    /// Indices into `tags` for the remaining tags. Values are popped from the front of
+    /// this vec as the iterator is consumed. When `tags` is `None`, this is a single-
+    /// item vec whose value doesn't matter (see docs for `next()`).
     indices: Vec<usize>,
 }
 
@@ -988,16 +977,16 @@ impl<'a> TagIter<'a> {
 impl<'a> Iterator for TagIter<'a> {
     type Item = (Option<&'a str>, Iter<'a>);
 
-    /// Pops the first index off the front of `indices`, then uses that to
-    /// determine what to yield.
+    /// Pops the first index off the front of `indices`, then uses that to determine
+    /// what to yield.
     ///
-    /// When `tags` is a vec, this yields the tag at the index and an `Iter`
-    /// over the repos with the specified tag.
+    /// When `tags` is a vec, this yields the tag at the index and an `Iter` over the
+    /// repos with the specified tag.
     ///
-    /// When `tags` is `None`, this discards the index value and yields `None`
-    /// for the tag and an `Iter` over all configured repos. (The next time
-    /// `next()` is called, `indices` is empty and [just] `None` is yielded,
-    /// stopping iteration after the first pass.)
+    /// When `tags` is `None`, this discards the index value and yields `None` for the
+    /// tag and an `Iter` over all configured repos. (The next time `next()` is called,
+    /// `indices` is empty and [just] `None` is yielded, stopping iteration after the
+    /// first pass.)
     fn next(&mut self) -> Option<Self::Item> {
         if self.indices.is_empty() {
             return None;
@@ -1012,7 +1001,7 @@ impl<'a> Iterator for TagIter<'a> {
     }
 }
 
-// ----- Invocation ---------------------------------------------------------------------------------------------------
+// ----- Invocation -----------------------------------------------------------
 
 /// All state for a given invocation of the program.
 pub struct Invocation<'a> {
@@ -1071,8 +1060,8 @@ impl<'a> Invocation<'a> {
         self.sigterms_received.load(Ordering::Relaxed)
     }
 
-    /// Returns a `TagIter` based on the end-user arguments supplied in the
-    /// argument named `arg`.
+    /// Returns a `TagIter` based on the end-user arguments supplied in the argument
+    /// named `arg`.
     ///
     /// See the documentation for `TagIter` for a full explanation.
     pub fn iter_tags(&self, arg: &str) -> TagIter {

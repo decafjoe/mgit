@@ -5,7 +5,7 @@ use git2::{Branch, BranchType, Oid, Repository};
 
 use app::Error;
 
-// ----- Kind ---------------------------------------------------------------------------------------------------------
+// ----- Kind -----------------------------------------------------------------
 
 /// Generic indicator for "result" or "status."
 #[derive(Clone, PartialEq, PartialOrd)]
@@ -20,7 +20,7 @@ pub enum Kind {
     Failure,
 }
 
-// ----- Note ---------------------------------------------------------------------------------------------------------
+// ----- Note -----------------------------------------------------------------
 
 /// Represents an item in a `Summary`.
 #[derive(Clone)]
@@ -59,12 +59,12 @@ impl Note {
     }
 }
 
-// ----- Iter ---------------------------------------------------------------------------------------------------------
+// ----- Iter -----------------------------------------------------------------
 
 /// Iterator for a `Summary`.
 ///
-/// Items are yielded in consistent order. They're first sorted by
-/// `Note.group()`, then (for notes with equal groups) by `Note.message()`.
+/// Items are yielded in consistent order. They're first sorted by `Note.group()`,
+/// then (for notes with equal groups) by `Note.message()`.
 pub struct Iter<'a> {
     /// Sorted vec of integer indices into the notes for the `Summary`.
     indices: Vec<usize>,
@@ -95,7 +95,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
-// ----- Summary ------------------------------------------------------------------------------------------------------
+// ----- Summary --------------------------------------------------------------
 
 /// Represents a summary of current status or the results of an operation.
 pub struct Summary {
@@ -109,8 +109,7 @@ impl Summary {
         Self { notes: Vec::new() }
     }
 
-    /// Adds a new `Note` to this summary. Takes ownership of the `note`
-    /// instance.
+    /// Adds a new `Note` to this summary. Takes ownership of the `note` instance.
     pub fn push_note(&mut self, note: Note) {
         self.notes.push(note)
     }
@@ -129,8 +128,8 @@ impl Summary {
         self.notes.as_slice()
     }
 
-    /// Returns an `Iter` for this summary, which yields notes in a
-    /// stably-sorted order.
+    /// Returns an `Iter` for this summary, which yields notes in a stably-sorted
+    /// order.
     ///
     /// See the documentation for `Iter` for more information.
     pub fn iter(&self) -> Iter {
@@ -150,7 +149,7 @@ impl Summary {
     }
 }
 
-// ----- TrackingBranch -----------------------------------------------------------------------------------------------
+// ----- TrackingBranch -------------------------------------------------------
 
 /// Convenience wrapper for a tracking branch.
 pub struct TrackingBranch<'a> {
@@ -211,12 +210,12 @@ impl<'a> TrackingBranch<'a> {
     }
 }
 
-// ----- TrackingBranches ---------------------------------------------------------------------------------------------
+// ----- TrackingBranches -----------------------------------------------------
 
 /// Convenience iterator for iterating through tracking branches.
 ///
-/// The main feature of this struct is the validation done on initialization.
-/// For each local branch this checks:
+/// The main feature of this struct is the validation done on initialization. For
+/// each local branch this checks:
 ///
 /// * That the branch has an upstream (if not, the branch will not be yielded
 /// from the iterator) * That the local branch has a (valid utf-8) name
@@ -224,16 +223,15 @@ impl<'a> TrackingBranch<'a> {
 /// * That the upstream branch has a (valid utf-8) name
 /// * That we can get the upstream branch's oid
 ///
-/// As a result, for branches yielded from this iterator, it is safe to unwrap
-/// the values returned by the git2 API for name and oid.
+/// As a result, for branches yielded from this iterator, it is safe to unwrap the
+/// values returned by the git2 API for name and oid.
 pub struct TrackingBranches<'a> {
     /// `Vec` of tracking branches remaining to be iterated through.
     branches: Vec<TrackingBranch<'a>>,
 }
 
 impl<'a> TrackingBranches<'a> {
-    /// Creates and returns a new `TrackingBranches` iterator for the
-    /// repository `git`.
+    /// Creates and returns a new `TrackingBranches` iterator for the repository `git`.
     pub fn for_repository(git: &'a Repository) -> Result<Self, Vec<Error>> {
         match TrackingBranches::get(git) {
             Ok(branches) => Ok(Self { branches }),
@@ -241,9 +239,8 @@ impl<'a> TrackingBranches<'a> {
         }
     }
 
-    /// Creates and returns a new `TrackingBranches` iterator for the
-    /// repository `git`, limited to tracking branches whose upstream is the
-    /// remote named `name`.
+    /// Creates and returns a new `TrackingBranches` iterator for the repository `git`,
+    /// limited to tracking branches whose upstream is the remote named `name`.
     pub fn for_remote(git: &'a Repository, name: &str) -> Result<Self, Vec<Error>> {
         match TrackingBranches::get(git) {
             Ok(branches) => {
@@ -261,9 +258,8 @@ impl<'a> TrackingBranches<'a> {
         }
     }
 
-    /// Returns a vec of local `TrackingBranch` references that represent valid
-    /// (per the description in the struct documentation) local branch
-    /// references.
+    /// Returns a vec of local `TrackingBranch` references that represent valid (per
+    /// the description in the struct documentation) local branch references.
     fn get(git: &'a Repository) -> Result<Vec<TrackingBranch<'a>>, Vec<Error>> {
         let branches = match git.branches(Some(BranchType::Local)) {
             Ok(branches) => branches,

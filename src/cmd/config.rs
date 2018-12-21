@@ -44,8 +44,8 @@ pub fn run(invocation: &Invocation) {
             println!();
         }
         for (path, repo) in repos.iter_field(Field::Path).sorted_by(Field::Path) {
-            // Compute and take references to certain values. We do this before creating
-            // the `info` map below so that things are deallocated in the correct order.
+            // Compute and take references to certain values. We do this before creating the
+            // `info` map below so that things are deallocated in the correct order.
             let name_default = &format!("{} (default)", repo.name_or_default());
             let symbol_default = &format!("{} (default)", repo.symbol_or_default());
 
@@ -63,10 +63,10 @@ pub fn run(invocation: &Invocation) {
                 s
             };
 
-            // Buffer information into a hashmap that iterates in insertion order. We need
-            // to buffer since we want to draw ┖ on the last line instead of ┠, and we
-            // don't know what the last line is until we look at all the settings (taking
-            // `verbose` into consideration).
+            // Buffer information into a hashmap that iterates in insertion order. We need to
+            // buffer since we want to draw ┖ on the last line instead of ┠, and we don't
+            // know what the last line is until we look at all the settings (taking `verbose`
+            // into consideration).
             let mut info = IndexMap::new();
             info.insert("config", repo.config_path());
             info.insert("path", repo.full_path());
