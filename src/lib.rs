@@ -59,18 +59,21 @@ static COMMANDS: [Command; 3] = [
     Command {
         name: config::NAME,
         about: config::ABOUT,
+        exit_on_sigterm: config::EXIT_ON_SIGTERM,
         args: config::args,
         run: config::run,
     },
     Command {
         name: pull::NAME,
         about: pull::ABOUT,
+        exit_on_sigterm: pull::EXIT_ON_SIGTERM,
         args: pull::args,
         run: pull::run,
     },
     Command {
         name: status::NAME,
         about: status::ABOUT,
+        exit_on_sigterm: status::EXIT_ON_SIGTERM,
         args: status::args,
         run: status::run,
     },
@@ -122,6 +125,9 @@ pub fn main() {
         .join()
         .expect("failed to get results from init function");
 
+    // Grab the value of `exit_on_sigterm`. We'll need it later.
+    let exit_on_sigterm = invocation.command().exit_on_sigterm;
+
     // Run the subcommand in a separate thread, keeping the main thread free to
     // listen for terminate signals.
     let (run_tx, run_rx) = crossbeam_channel::bounded(0);
@@ -135,7 +141,13 @@ pub fn main() {
     loop {
         select! {
             recv(run_rx) -> _ => { exit(0); },
-            recv(term_rx) -> _ => { term_arc_main.fetch_add(1, Ordering::Relaxed); },
+            recv(term_rx) -> _ => {
+                if exit_on_sigterm {
+                    eprintln!();
+                    exit(1);
+                }
+                term_arc_main.fetch_add(1, Ordering::Relaxed);
+            },
         }
     }
 }

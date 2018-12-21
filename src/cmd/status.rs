@@ -12,6 +12,8 @@ use ui::{Kind, Note, Summary, TrackingBranches};
 pub const NAME: &str = "status";
 /// One-line description of the command (`status`).
 pub const ABOUT: &str = "Prints current status of repositories";
+/// This is a "simple" command.
+pub const EXIT_ON_SIGTERM: bool = true;
 
 /// Name of the argument for `-t/--tag`.
 const TAG_ARG: &str = "TAG";
