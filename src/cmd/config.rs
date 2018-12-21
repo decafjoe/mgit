@@ -9,6 +9,8 @@ use app::{Field, Invocation};
 pub const NAME: &str = "config";
 /// One-line description of the command (`config`).
 pub const ABOUT: &str = "Prints configuration as interpreted by mgit";
+/// This is a "simple" command.
+pub const EXIT_ON_SIGTERM: bool = true;
 
 /// Name of the argument for `-t/--tag`.
 const TAG_ARG: &str = "TAG";

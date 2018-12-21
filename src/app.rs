@@ -147,6 +147,14 @@ pub struct Command<'a> {
     pub name: &'a str,
     /// Short one-line description of the command.
     pub about: &'a str,
+    /// Specifies how to handle SIGINT/SIGTERM. If `true`, mgit calls
+    /// `exit(1)` when it receives a sigterm, expecting that the command has not
+    /// spawned any child processes and will not leave any repos in a broken
+    /// state if suddenly killed. If `false`, mgit increments a counter (see
+    /// `Invocation.sigterms_received()`) and expects the command to check the
+    /// invocation and gracefully finish what it's doing when a sigterm has been
+    /// received.
+    pub exit_on_sigterm: bool,
     /// Vec of clap arguments for the command.
     pub args: fn() -> Vec<Arg<'a, 'a>>,
     /// Reference to function to invoke when command is called.

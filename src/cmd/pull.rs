@@ -28,6 +28,10 @@ use ui::{Kind, Note, Summary, TrackingBranches};
 pub const NAME: &str = "pull";
 /// One-line description of the command (`pull`).
 pub const ABOUT: &str = "Fetches from remotes and fast-forwards local tracking branches if safe";
+/// This is not a "simple" command. It both spawns child processes and is not
+/// amenable to suddenly being killed (could cause an incomplete write to the
+/// git repo).
+pub const EXIT_ON_SIGTERM: bool = false;
 
 /// Name of the argument for `-c/--concurrent`.
 const CONCURRENT_ARG: &str = "CONCURRENT";
