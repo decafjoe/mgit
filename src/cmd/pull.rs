@@ -30,8 +30,8 @@ pub const NAME: &str = "pull";
 /// One-line description of the command (`pull`).
 pub const ABOUT: &str = "Fetches from remotes and fast-forwards local tracking branches if safe";
 /// This is not a "simple" command. It both spawns child processes and is not
-/// amenable to suddenly being killed (could cause an incomplete write to the
-/// git repo).
+/// amenable to suddenly being killed (could cause an incomplete write to the git
+/// repo).
 pub const EXIT_ON_SIGTERM: bool = false;
 
 /// Name of the argument for `-c/--concurrent`.
@@ -52,12 +52,11 @@ const FETCH_SUCCESS_GROUP: usize = 100;
 /// Group number for branch status messages.
 const BRANCH_STATUS_GROUP: usize = 101;
 
-/// Number of times per second to update status of operations, as well
-/// as the UI showing the status.
+/// Number of times per second to update status of operations, as well as the UI
+/// showing the status.
 const UPDATE_FREQUENCY: u64 = 100;
 
-/// Number of milliseconds after which a terminal resize is considered
-/// "settled."
+/// Number of milliseconds after which a terminal resize is considered "settled."
 const DEBOUNCE_MILLIS: u64 = 500;
 
 /// Convenience type for a `HashMap` mapping a `Repo` to its `Summary`.
@@ -110,10 +109,10 @@ pub fn run(invocation: &Invocation) {
         }
     }
 
-    // `remotes` starts as a vec of all the `(&Repo, remote: &str)` pairs we need
-    // to fetch. As fetch threads become available, items are popped from the front
-    // of this vec. Once the vec is empty, we're done. (...after we wait for the
-    // current fetches to finish, of course.)
+    // `remotes` starts as a vec of all the `(&Repo, remote: &str)` pairs we need to
+    // fetch. As fetch threads become available, items are popped from the front of
+    // this vec. Once the vec is empty, we're done. (...after we wait for the current
+    // fetches to finish, of course.)
     let mut remotes = Vec::new();
 
     // `results` maps a `&Repo` to its `Summary`. Fetch threads trasmit `Summary`
@@ -121,27 +120,28 @@ pub fn run(invocation: &Invocation) {
     // `Summary` stored in this map.
     let mut results: Results = HashMap::new();
 
-    // Iterator on which we check `next()` for Ctrl-c from the user. This is required because the
-    // terminal does not translate keyboard input into interrupts when it is in raw mode. So we
-    // watch for that key chord in addition to checking `sigterms_received()`, which can still be
-    // triggered by signals from outside this program.
+    // Iterator on which we check `next()` for Ctrl-c from the user. This is required
+    // because the terminal does not translate keyboard input into interrupts when it
+    // is in raw mode. So we watch for that key chord in addition to checking
+    // `sigterms_received()`, which can still be triggered by signals from outside
+    // this program.
     let mut stdin = termion::async_stdin().keys();
 
-    // Represents the termination state of the operation. See the documentation
-    // on the `TerminationState` enum for more information.
+    // Represents the termination state of the operation. See the documentation on the
+    // `TerminationState` enum for more information.
     let mut termination_state = TerminationState::None;
 
-    // The block controls the scope of `stdout`. We put the terminal into raw mode
-    // to display the in-progress UI. When `stdout` goes out of scope, the terminal
-    // state is reset via the destructor.
+    // The block controls the scope of `stdout`. We put the terminal into raw mode to
+    // display the in-progress UI. When `stdout` goes out of scope, the terminal state
+    // is reset via the destructor.
     {
         let mut stdout = stdout()
             .into_raw_mode()
             .expect("failed to put terminal into raw mode");
 
-        // The UI instance controls all output to the terminal while the fetch threads
-        // are running. UI code is messy -- so we hide the complexity. That way, the
-        // main loop logic isn't cluttered.
+        // The UI instance controls all output to the terminal while the fetch threads are
+        // running. UI code is messy -- so we hide the complexity. That way, the main loop
+        // logic isn't cluttered.
         let mut ui = UI::new(&mut stdout);
 
         // Initialize `remotes`, `results`, and `ui`.
@@ -179,24 +179,23 @@ pub fn run(invocation: &Invocation) {
         // Turn `UPDATE_FREQUENCY` into an amount of time to sleep between updates.
         let t = Duration::from_millis(1000 / UPDATE_FREQUENCY);
 
-        // `results_tx` gets cloned and handed off to each fetch thread. The
-        // thread is expected to send a single message:
+        // `results_tx` gets cloned and handed off to each fetch thread. The thread is
+        // expected to send a single message:
         //
         //   (&Repo, String, Summary)
         //
-        // Once `results_rx` receives the message, the main loop assumes the
-        // fetch thread is complete, and it will start a new fetch thread.
+        // Once `results_rx` receives the message, the main loop assumes the fetch thread
+        // is complete, and it will start a new fetch thread.
         let (results_tx, results_rx) = crossbeam_channel::unbounded();
 
-        // Handles to the senders whose receiving ends are in the threads
-        // running the `git fetch` subprocesses. If the user wants to hard
-        // cancel the fetches, a single message is sent across each channel from
-        // the main thread to the child threads, which lets them know to
-        // terminate.
+        // Handles to the senders whose receiving ends are in the threads running the `git
+        // fetch` subprocesses. If the user wants to hard cancel the fetches, a single
+        // message is sent across each channel from the main thread to the child threads,
+        // which lets them know to terminate.
         let mut term_txs: Vec<Sender<bool>> = Vec::new();
 
-        // Use crossbeam magic (?) because Rust threading primitives are above my head
-        // and this is, like, incredibly clean-looking and appears to work exactly as
+        // Use crossbeam magic (?) because Rust threading primitives are above my head and
+        // this is, like, incredibly clean-looking and appears to work exactly as
         // expected.
         crossbeam::scope(|scope| {
             // Loop until all the current threads are complete and we have nothing left to do.
@@ -224,8 +223,8 @@ pub fn run(invocation: &Invocation) {
                         invocation.sigterm_received();
                     }
                 }
-                // Move to "soft" termination state if we're currently running
-                // normally but the user has asked for termination.
+                // Move to "soft" termination state if we're currently running normally but the
+                // user has asked for termination.
                 if termination_state == TerminationState::None && invocation.sigterms_received() > 0
                 {
                     // Drain the pending fetches, setting their state to canceled.
@@ -236,15 +235,14 @@ pub fn run(invocation: &Invocation) {
                     ui.cancel(&results);
                     termination_state = TerminationState::Soft;
                 }
-                // Move to "hard" termination state if we're currently in "soft"
-                // termination state and we have received two or more sigterms.
+                // Move to "hard" termination state if we're currently in "soft" termination state
+                // and we have received two or more sigterms.
                 if termination_state == TerminationState::Soft && invocation.sigterms_received() > 1
                 {
                     for tx in &term_txs {
-                        // The `term_txs` vec has references to all threads that
-                        // have been started. If some have completed, those rx
-                        // sides will be dead and sending a message will error
-                        // out. This is an expected behavior, so ignore any
+                        // The `term_txs` vec has references to all threads that have been started.
+                        // If some have completed, those rx sides will be dead and sending a
+                        // message will error out. This is an expected behavior, so ignore any
                         // errors.
                         let _ = tx.send(true);
                     }
@@ -282,9 +280,8 @@ pub fn run(invocation: &Invocation) {
         ui.cleanup();
     } // end scope of `stdout`, terminal state should be reset
 
-    // If the user sent two sigterms, assume it signals the intent "get me the
-    // hell out of here as quickly as possible" -- don't bother them with a
-    // summary.
+    // If the user sent two sigterms, assume it signals the intent "get me the hell
+    // out of here as quickly as possible" -- don't bother them with a summary.
     if termination_state == TerminationState::Hard {
         println!();
         return;
@@ -321,20 +318,19 @@ pub fn run(invocation: &Invocation) {
     println!();
 }
 
-// ----- TerminationState ---------------------------------------------------------------------------------------------
+// ----- TerminationState -----------------------------------------------------
 
 #[derive(PartialEq)]
 enum TerminationState {
     /// Not termination; running normally.
     None,
-    /// Soft termination; allow running fetches to complete, do not start any
-    /// new ones.
+    /// Soft termination; allow running fetches to complete, do not start any new ones.
     Soft,
     /// Hard termination; kill all fetch processes and exit.
     Hard,
 }
 
-// ----- style_for_kind -----------------------------------------------------------------------------------------------
+// ----- style_for_kind -------------------------------------------------------
 
 /// Returns the "standard" `Style` for the given `kind`.
 fn style_for_kind(kind: &Kind) -> Style {
@@ -346,64 +342,64 @@ fn style_for_kind(kind: &Kind) -> Style {
     }
 }
 
-// ----- fetch_and_ff -------------------------------------------------------------------------------------------------
+// ----- fetch_and_ff ---------------------------------------------------------
 
-/// Fetches remote, fast-forwards tracking branches if safe to do so, and
-/// returns a `Summary` with the results of those operations.
+/// Fetches remote, fast-forwards tracking branches if safe to do so, and returns a
+/// `Summary` with the results of those operations.
 ///
 /// # Fast-forwards
 ///
-/// If a remote is fetched successfully, mgit iterates through the list of
-/// local branches that are tracking an upstream branch from the remote. If the
-/// remote is a simple fast-forward from local, mgit goes ahead and does so.
+/// If a remote is fetched successfully, mgit iterates through the list of local
+/// branches that are tracking an upstream branch from the remote. If the remote is
+/// a simple fast-forward from local, mgit goes ahead and does so.
 ///
-/// mgit will not touch the local branch if it contains commits that are not
-/// known to the upstream (i.e. if local is ahead of upstream, or if the
-/// branches have diverged).
+/// mgit will not touch the local branch if it contains commits that are not known
+/// to the upstream (i.e. if local is ahead of upstream, or if the branches have
+/// diverged).
 ///
-/// If the local branch is HEAD, mgit will additionally check that the worktree
-/// is completely clean (i.e. there is nothing in the index, there are no
-/// modified files, there are no untracked files). If the worktree is anything
-/// but pristine, mgit will not try to fast-forward.
+/// If the local branch is HEAD, mgit will additionally check that the worktree is
+/// completely clean (i.e. there is nothing in the index, there are no modified
+/// files, there are no untracked files). If the worktree is anything but pristine,
+/// mgit will not try to fast-forward.
 ///
 /// # Git Executable vs libgit2
 ///
-/// For the fetch, the git executable is used instead of the libgit2 bindings
-/// (i.e. this creates a child process that runs `git fetch <remote>` in the
-/// repo's directory).
+/// For the fetch, the git executable is used instead of the libgit2 bindings (i.e.
+/// this creates a child process that runs `git fetch <remote>` in the repo's
+/// directory).
 ///
 /// A while back I wrote a Python version of mgit which also used the libgit2
-/// bindings and it did not play well with git-remote-gcrypt. I'm sure it can
-/// be made to work, but the number of lines of code it would take compared to
-/// the couple tens of lines it takes to use a child process makes it a hard
-/// sell.
+/// bindings and it did not play well with git-remote-gcrypt. I'm sure it can be
+/// made to work, but the number of lines of code it would take compared to the
+/// couple tens of lines it takes to use a child process makes it a hard sell.
 ///
 /// More generally, using the libgit2 API would seem to break *any* git remote
 /// helper program that relies on the `git-remote-XYZ`-as-a-command-on-PATH
 /// pattern.
 ///
 /// Performance-wise, the fetch itself is going to be in a completely different
-/// league of slow than any difference between subprocess and in-process API
-/// usage. So... no loss there.
+/// league of slow than any difference between subprocess and in-process API usage.
+/// So... no loss there.
 ///
-/// Technically, I guess the git executable might not be present (and the code
-/// does not handle this case). But, seriously, who's using mgit that doesn't
-/// have git installed and on the PATH? (Those sound an awful lot like famous
-/// last words.)
+/// Technically, I guess the git executable might not be present (and the code does
+/// not handle this case). But, seriously, who's using mgit that doesn't have git
+/// installed and on the PATH? (Those sound an awful lot like famous last words.)
 #[allow(clippy::cast_possible_wrap)]
 fn fetch_and_ff(term_rx: &Receiver<bool>, repo: &Repo, name: &str) -> Summary {
-    // The `git fetch` subprocess can spawn its own subprocesses. If we need to kill `git fetch` we
-    // want to kill all its children as well. To do so, we make sure `git fetch` and its children
-    // all have the same process group id (which we make sure is different than the parent process'
-    // pgid), then use `killpg(pgid)` to kill the children without touching the parent.
+    // The `git fetch` subprocess can spawn its own subprocesses. If we need to kill
+    // `git fetch` we want to kill all its children as well. To do so, we make sure
+    // `git fetch` and its children all have the same process group id (which we make
+    // sure is different than the parent process' pgid), then use `killpg(pgid)` to
+    // kill the children without touching the parent.
     //
-    // By default children inherit the same pgid as the parent, so setting the right pgid for the
-    // `git fetch` means its children will also have the correct value.
+    // By default children inherit the same pgid as the parent, so setting the right
+    // pgid for the `git fetch` means its children will also have the correct value.
     //
-    // We use `before_exec` to set the pgid for `git fetch`. Per the documentation, `before_exec`
-    // runs after the process fork, so the child will have a new, unique pid. When `setpgid(pid,
-    // pgid)` is called with a 0 for the first argument, the call applies to the calling process
-    // (our child). When pgid is 0, the pgid is set to the same value as the pid.
+    // We use `before_exec` to set the pgid for `git fetch`. Per the documentation,
+    // `before_exec` runs after the process fork, so the child will have a new, unique
+    // pid. When `setpgid(pid, pgid)` is called with a 0 for the first argument, the
+    // call applies to the calling process (our child). When pgid is 0, the pgid is
+    // set to the same value as the pid.
     let mut child = Command::new("git")
         .args(&["fetch", name])
         .current_dir(repo.full_path())
@@ -417,9 +413,9 @@ fn fetch_and_ff(term_rx: &Receiver<bool>, repo: &Repo, name: &str) -> Summary {
         .spawn()
         .expect("failed to start `git fetch` command");
 
-    // Periodically check whether the process has exited, or whether the mgit has received a
-    // sigterm (in which case the child processes are killed and an empty summary returned
-    // immediately).
+    // Periodically check whether the process has exited, or whether the mgit has
+    // received a sigterm (in which case the child processes are killed and an empty
+    // summary returned immediately).
     let t = Duration::from_millis(1000 / UPDATE_FREQUENCY);
     while None
         == child
@@ -442,8 +438,8 @@ fn fetch_and_ff(term_rx: &Receiver<bool>, repo: &Repo, name: &str) -> Summary {
         thread::sleep(t);
     }
 
-    // Make a final blocking call (which shouldn't actually block) to get the output from the
-    // command and determine whether it completed successfully.
+    // Make a final blocking call (which shouldn't actually block) to get the output
+    // from the command and determine whether it completed successfully.
     let error = match child.wait_with_output() {
         Ok(out) => {
             if out.status.success() {
@@ -620,7 +616,7 @@ fn fetch_and_ff(term_rx: &Receiver<bool>, repo: &Repo, name: &str) -> Summary {
     summary
 }
 
-// ----- State --------------------------------------------------------------------------------------------------------
+// ----- State ----------------------------------------------------------------
 
 /// Represents the state of the fetch/fast-forward for a remote.
 #[derive(Clone, Debug)]
@@ -633,26 +629,25 @@ enum State {
     Fetching,
     /// Fetch was successful, no tracking branches were ahead or behind.
     NoChange,
-    /// Fetch was successful, one or more tracking branches was successfully
-    /// fast-forwarded.
+    /// Fetch was successful, one or more tracking branches was successfully fast-
+    /// forwarded.
     Success,
-    /// Fetch was successful, one or more tracking branches is ahead of its
-    /// upstream.
+    /// Fetch was successful, one or more tracking branches is ahead of its upstream.
     Warning,
-    /// Fetch was unsuccessful or one or more fast-forwards failed (due to HEAD
-    /// being dirty, or diverging local/upstream branches).
+    /// Fetch was unsuccessful or one or more fast-forwards failed (due to HEAD being
+    /// dirty, or diverging local/upstream branches).
     Failure,
 }
 
-// ----- UI -----------------------------------------------------------------------------------------------------------
+// ----- UI -------------------------------------------------------------------
 
 /// Manages the user interface during fetch and fast-forward.
 struct UI<'a, W: 'a + Write> {
-    /// Maps `&Repo` to another `HashMap`, which maps remote names to their
-    /// current `State`.
+    /// Maps `&Repo` to another `HashMap`, which maps remote names to their current
+    /// `State`.
     state: HashMap<&'a Repo, HashMap<String, State>>,
-    /// Queue of updates to be made next time `process_updates` is called.
-    /// Format is `(<repo>, <remote-name>, <state>)`.
+    /// Queue of updates to be made next time `process_updates` is called. Format is
+    /// `(<repo>, <remote-name>, <state>)`.
     updates: Vec<(&'a Repo, String, State)>,
     /// Indicates whether the user has terminated the program.
     canceled: bool,
@@ -662,27 +657,26 @@ struct UI<'a, W: 'a + Write> {
     drawn: (u16, u16),
     /// Holds the terminal resize debounce state.
     ///
-    /// Every iteration of the main loop (inside the call to `update`), we
-    /// check the terminal size. When terminal size changes from the `drawn`
-    /// size, this gets set to `Some(<new-width>, <new-height>,
-    /// Instant::now())`.
+    /// Every iteration of the main loop (inside the call to `update`), we check the
+    /// terminal size. When terminal size changes from the `drawn` size, this gets set
+    /// to `Some(<new-width>, <new-height>, Instant::now())`.
     ///
-    /// Subsequent updates will continue to check terminal size. If it changes
-    /// again, a new `Some(w, h, Instant::now())` value is generated. If
-    /// `DEBOUNCE_MILLIS` goes by without a change, mgit assumes the user is
-    /// done resizing and redraws the UI based on the new terminal size.
-    /// (Debounce is then set to `None` as we are done debouncing.)
+    /// Subsequent updates will continue to check terminal size. If it changes again, a
+    /// new `Some(w, h, Instant::now())` value is generated. If `DEBOUNCE_MILLIS` goes
+    /// by without a change, mgit assumes the user is done resizing and redraws the UI
+    /// based on the new terminal size. (Debounce is then set to `None` as we are done
+    /// debouncing.)
     debounce: Option<(u16, u16, Instant)>,
-    /// Cache of all strings drawn to the screen as well as their location,
-    /// keyed by `&Repo` and optionally remote name (a `String`).
+    /// Cache of all strings drawn to the screen as well as their location, keyed by
+    /// `&Repo` and optionally remote name (a `String`).
     ///
     /// The values are of the form `(x, y, <string>)` where x and y are termion
-    /// coordinates and `<string>` is the string that was drawn to the screen
-    /// for the key.
+    /// coordinates and `<string>` is the string that was drawn to the screen for the
+    /// key.
     ///
-    /// A key of `(&Repo, None)` is the location of the overall repo status
-    /// display. Otherwise the key will be `(&Repo, Some(String))` where the
-    /// string represents the name of the remote.
+    /// A key of `(&Repo, None)` is the location of the overall repo status display.
+    /// Otherwise the key will be `(&Repo, Some(String))` where the string represents
+    /// the name of the remote.
     locations: HashMap<(&'a Repo, Option<String>), (u16, u16, String)>,
 }
 
@@ -759,15 +753,14 @@ impl<'a, W: Write> UI<'a, W> {
             .expect("failed to flush content to the terminal");
     }
 
-    /// Draws the UI to `self.t`, with a width of `w` and height `h`, based on
-    /// results `results`.
+    /// Draws the UI to `self.t`, with a width of `w` and height `h`, based on results
+    /// `results`.
     ///
-    /// **This is an internal method and should not be called outside the
-    /// impl.**
+    /// **This is an internal method and should not be called outside the impl.**
     #[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
     fn draw(&mut self, w: u16, h: u16, results: &Results) {
-        // We do some calculations where we need width and height as a usize, so we
-        // just assign them some variables.
+        // We do some calculations where we need width and height as a usize, so we just
+        // assign them some variables.
         let (w_usize, h_usize) = (w as usize, h as usize);
 
         // Clear the screen, and the current state of what's drawn where.
@@ -778,8 +771,8 @@ impl<'a, W: Write> UI<'a, W> {
         // state. Scope all the messy work so we can safely mutate a few things at the
         // end.
         {
-            // Get the full list of repos, sorted by name. Sorting is required to make the
-            // UI output deterministic.
+            // Get the full list of repos, sorted by name. Sorting is required to make the UI
+            // output deterministic.
             let mut repos: Vec<&&Repo> = self.state.keys().collect();
             repos.sort_by_key(|repo| (repo.name_or_default(), repo.path()));
 
@@ -794,8 +787,8 @@ impl<'a, W: Write> UI<'a, W> {
 
             // If number of repos is more than the number of lines we have to display them,
             // overflow_h contains the number of repos "past the bottom" of the terminal
-            // window. Count the "cancelling..." message as a repo since it takes up a line
-            // of output.
+            // window. Count the "cancelling..." message as a repo since it takes up a line of
+            // output.
             let mut rows_needed = repos.len();
             if self.canceled {
                 rows_needed += 1;
@@ -847,9 +840,9 @@ impl<'a, W: Write> UI<'a, W> {
                     remaining -= 1;
                 }
 
-                // We need at least two characters to draw a repo name (the first character
-                // plus an ellipsis). If we don't have two, draw an ellipsis at the far right
-                // and bail out of this loop iteration.
+                // We need at least two characters to draw a repo name (the first character plus
+                // an ellipsis). If we don't have two, draw an ellipsis at the far right and bail
+                // out of this loop iteration.
                 if remaining < 2 {
                     write!(self.t, "{}\u{2026}", cursor::Goto(w, y))
                         .expect("failed to write content to the terminal");
@@ -883,8 +876,8 @@ impl<'a, W: Write> UI<'a, W> {
                     (w - (remaining as u16) + 1, y, name.to_owned()),
                 );
 
-                // Reduce the remaining characters by the number of characters that we just
-                // drew into the line.
+                // Reduce the remaining characters by the number of characters that we just drew
+                // into the line.
                 remaining -= n;
 
                 // Get a sorted list of remotes. Sorting is required to make the UI output
@@ -973,8 +966,7 @@ impl<'a, W: Write> UI<'a, W> {
     /// Processes updates in the queue, updating internal state and the UI as
     /// necessary.
     ///
-    /// **This is an internal method and should not be called outside the
-    /// impl.**
+    /// **This is an internal method and should not be called outside the impl.**
     fn process_updates(&mut self, results: &Results) {
         for &(repo, ref remote, ref state) in &self.updates {
             if let Some(&(x, y, ref s)) = self.locations.get(&(repo, Some(remote.to_owned()))) {

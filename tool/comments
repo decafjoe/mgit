@@ -1,0 +1,141 @@
+#!/usr/bin/env python
+# -*- mode: python, coding: utf-8 -*-
+from __future__ import print_function
+
+import difflib
+import os
+import sys
+import tempfile
+import textwrap
+
+try:
+    import argparse
+except ImportError:
+    print('error: cannot import argparse', file=sys.stderr)
+    sys.exit(1)
+
+
+DEFAULT_FILL_COLUMN = 99
+DEFAULT_MAX_WIDTH = 79
+DEFAULT_PATH = os.path.join(
+    os.path.abspath(os.path.dirname(os.path.dirname(__file__))),
+    'src',
+)
+
+
+def format_comment(args, indent, prefix, comment):
+    wrap_width = args.max_width + len(indent) + len(prefix) + 1
+    if wrap_width > args.fill_column:
+        wrap_width = args.fill_column
+    return textwrap.fill(
+        comment,
+        wrap_width,
+        initial_indent=indent + prefix + ' ',
+        subsequent_indent=indent + prefix + ' ',
+    )
+
+
+def process_fresh_line(line):
+    indent, prefix, buf, new = '', None, None, ''
+    for (i, character) in enumerate(line):
+        if character == ' ':
+            indent += ' '
+        else:
+            break
+    if line[i:i + 2] == '//':
+        prefix, buf = line.split(None, 1)
+        buf = buf.strip()
+    else:
+        new = line
+    return indent, prefix, buf, new
+
+
+def process_file(args, path):
+    old, new = '', ''
+    with open(path) as f:
+        indent, prefix, buf = '', None, None
+        for line in f:
+            old += line
+            if buf is None:
+                indent, prefix, buf, new_append = process_fresh_line(line)
+                new += new_append
+            else:
+                if not line.lstrip().startswith(prefix):
+                    new += format_comment(args, indent, prefix, buf) + '\n'
+                    indent, prefix, buf, new_append = process_fresh_line(line)
+                    new += new_append
+                elif len(line.lstrip().lstrip(prefix).strip()) == 0:
+                    comment = format_comment(args, indent, prefix, buf)
+                    new += '%s\n%s%s\n' % (comment, indent, prefix)
+                    prefix, buf = None, None
+                else:
+                    buf += ' %s' % line.lstrip().lstrip(prefix).strip()
+    if args.check:
+        old_lines, new_lines = old.splitlines(), new.splitlines()
+        for line in difflib.unified_diff(old_lines, new_lines, lineterm=''):
+            print(line)
+    else:
+        with open(path, 'w') as f:
+            f.write(new)
+
+
+def main(argv=None, exit=sys.exit):
+    if argv is None:
+        argv = sys.argv
+
+    parser = argparse.ArgumentParser(
+        description='format comments in source files (very, very alpha)',
+    )
+    parser.add_argument(
+        '-c',
+        '--check',
+        action='store_true',
+        default=False,
+        help='run in "check" mode (does not rewrite files)',
+    )
+    parser.add_argument(
+        '-m',
+        '--max-width',
+        default=DEFAULT_MAX_WIDTH,
+        help='maximum width of a comment block (default: %(default)i)',
+    )
+    parser.add_argument(
+        '-n',
+        '--fill-column',
+        default=DEFAULT_FILL_COLUMN,
+        help='maximum column to fill to (default: %(default)i)',
+    )
+    parser.add_argument(
+        'target',
+        nargs='*',
+        help='files or directories to process (default: %s)' % DEFAULT_PATH,
+    )
+    args = parser.parse_args(argv[1:])
+
+    if not args.target:
+        args.target = [DEFAULT_PATH]
+
+    directories, files = [], []
+    for target in args.target:
+        path = os.path.abspath(os.path.expanduser(os.path.expandvars(target)))
+        if os.path.isfile(path):
+            files.append(path)
+        elif os.path.isdir(path):
+            directories.append(path)
+        else:
+            msg = 'warning: ignoring non-file, non-directory path: %s' % path
+            print(msg, file=sys.stderr)
+
+    for root_directory in directories:
+        for directory, _, filenames in os.walk(root_directory):
+            for filename in filenames:
+                process_file(args, os.path.join(directory, filename))
+
+    for filename in files:
+        process_file(args, filename)
+
+    exit(0)
+
+
+if __name__ == '__main__':
+    main()
