@@ -19,7 +19,6 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use crossbeam_channel::Sender;
 use git2::Repository;
 use ini::Ini;
-use pager::Pager;
 use users::{self, os::unix::UserExt};
 use walkdir::WalkDir;
 
@@ -1007,10 +1006,6 @@ impl<'a> Iterator for TagIter<'a> {
 
 // ----- Invocation ---------------------------------------------------------------------------------------------------
 
-/// Pager command and arguments. Tries to act like a number of git porcelain
-/// commands, like `git diff`.
-const PAGER: &str = "less -efFnrX";
-
 /// All state for a given invocation of the program.
 pub struct Invocation<'a> {
     /// `Config` instance.
@@ -1078,10 +1073,5 @@ impl<'a> Invocation<'a> {
             None => None,
         };
         TagIter::new(&self.config, tags)
-    }
-
-    /// Starts the pager with mgit's "standard" arguments.
-    pub fn start_pager(&self) {
-        Pager::with_pager(PAGER).setup();
     }
 }

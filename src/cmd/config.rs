@@ -33,7 +33,6 @@ pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
 
 /// Executes the `config` subcommand.
 pub fn run(invocation: &Invocation) {
-    invocation.start_pager();
     let verbose = invocation.matches().is_present(VERBOSE_ARG);
     let header = Style::new().bold().underline();
     for (tag, repos) in invocation.iter_tags(TAG_ARG) {
