@@ -14,6 +14,7 @@ use crossbeam;
 use crossbeam_channel::{self, Receiver, Sender};
 use git2::{ObjectType, ResetType, StatusOptions, StatusShow};
 use libc;
+use nix;
 use termion::{
     self, clear, cursor,
     event::Key,
@@ -408,8 +409,9 @@ fn fetch_and_ff(term_rx: &Receiver<bool>, repo: &Repo, name: &str) -> Summary {
         .current_dir(repo.full_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .before_exec(|| unsafe {
-            libc::setpgid(0, 0);
+        .before_exec(|| {
+            let pid_zero = nix::unistd::Pid::from_raw(0);
+            nix::unistd::setpgid(pid_zero, pid_zero).expect("failed to set process group id");
             Ok(())
         })
         .spawn()
@@ -425,8 +427,15 @@ fn fetch_and_ff(term_rx: &Receiver<bool>, repo: &Repo, name: &str) -> Summary {
             .expect("failed to get status of child process")
     {
         if term_rx.try_recv().is_ok() {
+            // NOTE: nix does not currently implement killpg (see
+            //       https://github.com/nix-rust/nix/issues/644)
+            // let pgid = nix::unistd::Pid::from_raw(child.id() as i32);
+            // let signal = Some(nix::sys::signal::Signal::SIGKILL);
+            // nix::sys::signal::killpg(pgid, signal).expect_or_else(|| {
+            //     &format!("failed to kill process group: {}", child.id() as i32,)
+            // });
             unsafe {
-                libc::killpg(child.id() as i32, 9);
+                assert_eq!(0, libc::killpg(child.id() as i32, 9));
             }
             return Summary::new();
         }
