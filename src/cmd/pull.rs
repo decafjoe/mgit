@@ -285,7 +285,6 @@ pub fn run(invocation: &Invocation) {
         return;
     }
 
-    invocation.start_pager();
     let header = Style::new().bold().underline();
     for (tag, repos) in invocation.iter_tags(TAG_ARG) {
         if let Some(tag) = tag {

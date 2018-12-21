@@ -32,7 +32,6 @@ extern crate git2;
 extern crate indexmap;
 extern crate ini;
 extern crate libc;
-extern crate pager;
 extern crate signal_hook;
 extern crate termion;
 extern crate users;

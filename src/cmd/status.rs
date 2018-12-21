@@ -51,7 +51,6 @@ pub fn args<'a>() -> Vec<Arg<'a, 'a>> {
 
 /// Executes the `status` subcommand.
 pub fn run(invocation: &Invocation) {
-    invocation.start_pager();
     let verbose = invocation.matches().is_present(VERBOSE_ARG);
     let header = Style::new().bold().underline();
     let mut cache: HashMap<&Repo, Summary> = HashMap::new();
