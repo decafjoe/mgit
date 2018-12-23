@@ -172,7 +172,7 @@ pub fn run(invocation: &Invocation) {
                                     ),
                                 ));
                             } else if behind > 0 {
-                                let s = if ahead == 1 { "" } else { "s" };
+                                let s = if behind == 1 { "" } else { "s" };
                                 summary.push_note(Note::new(
                                     BRANCH_STATUS_GROUP,
                                     Kind::Failure,
